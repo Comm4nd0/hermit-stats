@@ -39,9 +39,11 @@ RECENT_UPLOADS = 30
 
 
 def _discover(conn, cfg, hermit, cookies) -> int:
-    """Find the hermit's collection videos (playlists first, title match as fallback). Returns how many."""
+    """Find the hermit's collection videos (playlists first, title match as fallback). Returns how many.
+    Commits after each batch of writes, never across a YouTube request, so a build can run meanwhile."""
     info = youtube.channel_playlists(hermit.url, cookies)
     db.upsert_channel(conn, info["id"], hermit.slug, info["name"], hermit.url, info["avatar_url"])
+    conn.commit()
     found = 0
     uploads = recent = None
     for coll in cfg.collections:
@@ -53,11 +55,13 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                 picked.append((pid, coll.name))
         ids = set()
         for pid, title in picked:
+            listed = youtube.list_playlist(pid, cookies)
             db.upsert_playlist(conn, pid, info["id"], title, coll.name)
-            for v in youtube.list_playlist(pid, cookies):
+            for v in listed:
                 db.upsert_video(conn, info["id"], v)
                 db.add_to_collection(conn, coll.name, v["id"], f"playlist:{pid}")
                 ids.add(v["id"])
+            conn.commit()
         in_playlists = len(ids)
         if coll.video_title:
             if picked:
@@ -74,12 +78,12 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                     db.upsert_video(conn, info["id"], v)
                     db.add_to_collection(conn, coll.name, v["id"], "title")
                     ids.add(v["id"])
+            conn.commit()
         how = (f"{len(picked)} playlist{'s' * (len(picked) != 1)}" if picked
                else "title match" if coll.video_title else "nothing to match")
         extra = f" (+{len(ids) - in_playlists} recent not in a playlist)" if len(ids) > in_playlists and picked else ""
         console.print(f"  {hermit.name:<20} {coll.name}: [bold]{len(ids)}[/] videos via {how}{extra}")
         found += len(ids)
-    conn.commit()
     return found
 
 

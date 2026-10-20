@@ -207,3 +207,27 @@ def test_build_writes_every_data_file(tmp_path):
     assert status["sync"] == {"started": 1, "finished": 2}
     assert [(w["id"], w["why"]) for w in status["waiting"]] == [("late", "Waiting for Whisper")]
     assert (out / "index.html").exists() and (out / "app.js").exists()
+
+
+def test_discovery_never_holds_a_write_across_youtube_requests(tmp_path, monkeypatch):
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    calls = []
+
+    def request(result):
+        def fake(*a, **k):
+            calls.append(conn.in_transaction)
+            return result
+        return fake
+    vids = [{"id": f"v{i}", "title": f"Hermitcraft 11 Ep {i}", "upload_date": "20260101"} for i in range(3)]
+    monkeypatch.setattr(youtube, "channel_playlists", request(
+        {"id": "UCg", "name": "Grian", "avatar_url": None,
+         "playlists": [("PL1", "Hermitcraft 11"), ("PL2", "Hermitcraft Season 11 part 2")]}))
+    monkeypatch.setattr(youtube, "list_playlist", request(vids))
+    monkeypatch.setattr(youtube, "list_uploads", request(vids + [{"id": "new", "title": "Hermitcraft 11 Ep 9", "upload_date": "20260102"}]))
+    pattern = re.compile(r"hermitcraft.*11", re.I)
+    cfg = Config([Collection("Season 11", pattern, pattern), Collection("Season 11b", pattern, pattern)],
+                 [HERMITS[2]], None, None)
+    assert cli._discover(conn, cfg, HERMITS[2], None) == 8
+    assert len(calls) == 6 and not any(calls)     # no uncommitted write while YouTube was asked
+    assert not conn.in_transaction
