@@ -169,6 +169,7 @@ def cmd_sync(args) -> int:
                     budget_left = args.whisper_limit is None or whispered < args.whisper_limit
                     if result is None and whisper is not None and budget_left:
                         progress.update(task, description=f"[yellow]whisper[/] {(r['title'] or r['id'])[:42]}")
+                        conn.commit()      # Whisper takes minutes: don't hold the write lock (and block builds) meanwhile
                         result = whisper.transcribe(r["id"], args.lang, False, _cookies(args))
                         whispered += 1
                     if result is None and not budget_left:
