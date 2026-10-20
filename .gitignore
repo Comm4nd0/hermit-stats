@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.egg-info/
+*.db
+*.db-*
+cache/
+site/
+logs/
+cookies.txt
+deploy/hermit-stats.env

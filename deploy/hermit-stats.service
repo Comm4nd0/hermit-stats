@@ -1,0 +1,15 @@
+[Unit]
+Description=Hermit Stats: transcribe new Hermitcraft episodes, rebuild the stats site, push it to Luma001
+After=network-online.target
+Wants=network-online.target
+
+# A template: deploy/install-timer.sh fills in @REPO@ and @UV@ for this machine.
+[Service]
+Type=oneshot
+WorkingDirectory=@REPO@
+# Extra flags for this machine, e.g. HERMIT_STATS_ARGS=--cookies cookies.txt --model small
+EnvironmentFile=-@REPO@/deploy/hermit-stats.env
+ExecStart=@UV@ run hermit-stats update $HERMIT_STATS_ARGS
+Environment=PATH=@UVDIR@:/usr/local/bin:/usr/bin:/bin
+StandardOutput=append:@REPO@/logs/update.log
+StandardError=append:@REPO@/logs/update.log

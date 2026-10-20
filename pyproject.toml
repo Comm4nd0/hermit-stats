@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermit-stats"
+version = "0.1.0"
+description = "Transcribe Hermitcraft playlists and publish word, speech and interaction stats as a static site."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "yt-dlp[default]>=2025.10",   # [default] pulls yt-dlp-ejs; YouTube needs a JS runtime (deno)
+    "faster-whisper>=1.1",        # fallback when a video has no captions
+    "rich>=13",
+    # ctranslate2 is built against CUDA 12; ship its libs so a CUDA 13 system still works
+    "nvidia-cublas-cu12; sys_platform == 'linux'",
+    "nvidia-cudnn-cu12>=9,<10; sys_platform == 'linux'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+hermit-stats = "hermitstats.cli:main"
+
+[tool.setuptools]
+packages = ["hermitstats"]

@@ -1,0 +1,190 @@
+# hermit-stats configuration.
+#
+# [[collection]]  a group of videos analysed together (a season, a series). Each Hermit's videos are
+#                 found from their channel's playlists whose title matches `playlist`; if a channel has
+#                 no matching playlist, their uploads whose title matches `video_title` are used instead.
+#                 Both are case-insensitive regular expressions. Playlists / titles matching `skip` (livestreams,
+#                 shorts) are left out, and so is anything uploaded before `starts`.
+#
+# [[hermit]]      one YouTube channel; `short` is the name used on charts. `aliases` are what other Hermits call them on camera (plus common
+#                 auto-caption mishearings); a spoken alias in someone else's video counts as a mention.
+#                 `exclude` lists phrases that contain an alias but aren't about the Hermit
+#                 ("ender pearl" is not Pearl). `playlists` adds playlists by hand: { "Season 11" = "PL..." }.
+
+[deploy]
+target = "luma:/root/caddy/static/hermit-stats/"
+url = "https://hermit-stats.com"
+
+[[collection]]
+name = "Season 11"
+playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(11|xi)\b'
+video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(11|xi)\b'
+skip = 'stream|shorts|\blive\b'
+starts = "2025-11-01"
+
+[[collection]]
+name = "Season 10"
+playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
+video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
+skip = 'stream|shorts|\blive\b'
+starts = "2023-03-01"
+
+[[hermit]]
+name = "BdoubleO100"
+short = "Bdubs"
+channel = "@bdoubleo"
+aliases = ["bdubs", "b dubs", "bdubbs", "bdouble", "bdoubleo", "bee dubs"]
+
+[[hermit]]
+name = "Cubfan135"
+short = "Cub"
+channel = "@cubfan"
+aliases = ["cub", "cubfan", "cubs"]
+exclude = ["cub fan club"]
+
+[[hermit]]
+name = "Docm77"
+short = "Doc"
+channel = "@docm77"
+aliases = ["doc", "docm", "docm77", "doc m"]
+exclude = ["doc block", "document"]
+
+[[hermit]]
+name = "Etho"
+short = "Etho"
+channel = "@EthosLab"
+aliases = ["etho", "ethos", "ethoslab", "ethos lab", "eto"]
+
+[[hermit]]
+name = "FalseSymmetry"
+short = "False"
+channel = "@FalseSymmetry"
+aliases = ["false", "false symmetry", "falsesymmetry"]
+exclude = ["true or false", "true and false", "that's false", "is false", "false alarm", "false start",
+           "false positive", "false flag"]
+
+[[hermit]]
+name = "GeminiTay"
+short = "Gem"
+channel = "@GeminiTayMC"
+aliases = ["gem", "gemini", "gemini tay", "geminitay"]
+
+[[hermit]]
+name = "Grian"
+short = "Grian"
+channel = "@Grian"
+aliases = ["grian", "grain", "grion", "gryan"]
+exclude = ["grain of", "the grain", "wood grain"]
+
+[[hermit]]
+name = "Hypnotizd"
+short = "Hypno"
+channel = "@hypnotizd"
+aliases = ["hypno", "hypnotized", "hypnotizd"]
+
+[[hermit]]
+name = "iJevin"
+short = "Jevin"
+channel = "@iJevin"
+aliases = ["jevin", "ijevin", "jevan", "javin"]
+
+[[hermit]]
+name = "impulseSV"
+short = "Impulse"
+channel = "@impulseSV"
+aliases = ["impulse", "impulsesv", "impy"]
+
+[[hermit]]
+name = "Joe Hills"
+short = "Joe"
+channel = "@JoeHillsTSD"
+aliases = ["joe", "joe hills", "joehills"]
+
+[[hermit]]
+name = "Keralis"
+short = "Keralis"
+channel = "@Keralis"
+aliases = ["keralis", "keralas", "kerallis"]
+
+[[hermit]]
+name = "Mumbo Jumbo"
+short = "Mumbo"
+channel = "@ThatMumboJumbo"
+aliases = ["mumbo", "mumbo jumbo", "mumbojumbo", "mumbles"]
+
+[[hermit]]
+name = "PearlescentMoon"
+short = "Pearl"
+channel = "@PearlescentMoon"
+aliases = ["pearl", "pearlescent", "pearlescent moon", "pearlescentmoon"]
+exclude = ["ender pearl", "ender pearls", "pearl stasis", "pearl chamber", "pearl cannon", "throw a pearl",
+           "throw the pearl", "throw my pearl"]
+
+[[hermit]]
+name = "Rendog"
+short = "Ren"
+channel = "@rendog"
+aliases = ["ren", "rendog", "ren dog", "renbob"]
+
+[[hermit]]
+name = "GoodTimesWithScar"
+short = "Scar"
+channel = "@GoodTimesWithScar"
+aliases = ["scar", "scars", "goodtimeswithscar", "good times with scar"]
+
+[[hermit]]
+name = "SmallishBeans"
+short = "Joel"
+channel = "@SmallishBeans"
+aliases = ["joel", "smallishbeans", "smallish beans", "beans"]
+exclude = ["cocoa beans", "cocoa bean", "coffee beans"]
+
+[[hermit]]
+name = "Skizzleman"
+short = "Skizz"
+channel = "@MCSkizzleman"
+aliases = ["skizz", "skizzleman", "skiz", "skizzle"]
+
+[[hermit]]
+name = "Tango Tek"
+short = "Tango"
+channel = "UC4YUKOBld2PoOLzk0YZ80lw"
+aliases = ["tango", "tango tek", "tangotek", "tang"]
+
+[[hermit]]
+name = "VintageBeef"
+short = "Beef"
+channel = "@VintageBeef"
+aliases = ["beef", "vintage beef", "vintagebeef"]
+exclude = ["cooked beef", "raw beef", "beef jerky", "roast beef"]
+
+[[hermit]]
+name = "Welsknight"
+short = "Wels"
+channel = "@WelsknightGaming"
+aliases = ["wels", "welsknight", "wells", "welts"]
+exclude = ["oil wells", "wells of"]
+
+[[hermit]]
+name = "xBCrafted"
+short = "xB"
+channel = "@xBCrafted"
+aliases = ["xb", "xbcrafted", "x b"]
+
+[[hermit]]
+name = "Xisumavoid"
+short = "Xisuma"
+channel = "@xisumavoid"
+aliases = ["xisuma", "xisumavoid", "zuma", "x zuma", "xumavoid", "xisuma void"]
+
+[[hermit]]
+name = "Zedaph"
+short = "Zed"
+channel = "@Zedaph"
+aliases = ["zed", "zedaph", "zedaf"]
+
+[[hermit]]
+name = "ZombieCleo"
+short = "Cleo"
+channel = "@ZombieCleo"
+aliases = ["cleo", "zombie cleo", "zombiecleo", "clio"]
