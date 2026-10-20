@@ -95,6 +95,8 @@ const inkOn = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#0b0b0b'
 const tip = (value, label, extra = '') => `<div class="hovercard"><b>${esc(value)}</b> ${esc(label)}${extra}</div>`;
 const legend = () => ({ top: 0, left: 0, icon: 'roundRect', itemWidth: 14, itemHeight: 4, textStyle: { color: css('--ink-2') } });
 
+const VIEW_NAMES = { bar: 'Bars', line: 'Lines', scatter: 'Dots', heatmap: 'Heatmap', graph: 'Network', wordCloud: 'Word cloud', boxplot: 'Boxes', radar: 'Radar' };
+
 /** A card: title, subtitle, optional tools, a chart (or custom HTML) and a table view of the same numbers. */
 function card(container, spec) {
   const el = document.createElement('section');
@@ -128,14 +130,16 @@ function card(container, spec) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = 'Table';
-    btn.setAttribute('aria-pressed', 'false');
+    // While the table shows, the button names the view it switches back to.
+    const back = result.option ? VIEW_NAMES[result.option.series?.[0]?.type] || 'Chart' : 'Chips';
     const wrap = $('.tablewrap', el);
     btn.onclick = () => {
       const on = wrap.hidden;
       if (on && !wrap.firstChild) wrap.appendChild(table(result.table));
       wrap.hidden = !on;
-      if (result.option) body.hidden = on;
-      btn.setAttribute('aria-pressed', String(on));
+      body.hidden = on;
+      btn.textContent = on ? back : 'Table';
+      btn.title = on ? `Show the ${back.toLowerCase()} again` : 'Show the numbers as a table';
     };
     tools.appendChild(btn);
     if (result.tableOnly) { btn.click(); btn.remove(); }
