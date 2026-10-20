@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 SCHEMA = """
@@ -24,14 +25,17 @@ CREATE TABLE IF NOT EXISTS videos (
     like_count    INTEGER,
     comment_count INTEGER,
     url           TEXT,
-    details_at    INTEGER             -- when full metadata was last fetched
+    details_at    INTEGER,            -- when full metadata was last fetched
+    error         TEXT,               -- why the last fetch didn't give a transcript (cleared on success)
+    error_at      INTEGER
 );
 CREATE TABLE IF NOT EXISTS transcripts (
     video_id  TEXT PRIMARY KEY REFERENCES videos(id),
     source    TEXT NOT NULL,          -- 'manual-captions' | 'auto-captions' | 'whisper'
     language  TEXT,
     text      TEXT NOT NULL,
-    segments  TEXT NOT NULL           -- JSON list of {start, end, text}
+    segments  TEXT NOT NULL,          -- JSON list of {start, end, text}
+    added_at  INTEGER                 -- when it was saved: what "new since your last visit" goes by
 );
 CREATE TABLE IF NOT EXISTS playlists (
     id         TEXT PRIMARY KEY,
@@ -47,7 +51,15 @@ CREATE TABLE IF NOT EXISTS collection_videos (
     via        TEXT NOT NULL,
     PRIMARY KEY (collection, video_id)
 );
+-- Small facts about the last runs ('last_sync' -> JSON), shown on the site's status page.
+CREATE TABLE IF NOT EXISTS kv (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
 """
+
+# Columns added after the first release: (table, column, type). connect() adds any that are missing.
+_ADDED = (("videos", "error", "TEXT"), ("videos", "error_at", "INTEGER"), ("transcripts", "added_at", "INTEGER"))
 
 _VIDEO_COLS = ("title", "description", "upload_date", "timestamp", "duration", "view_count",
                "like_count", "comment_count", "url", "details_at")
@@ -58,6 +70,9 @@ def connect(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")   # build can read while a sync is writing
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    for table, col, typ in _ADDED:
+        if col not in {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
     return conn
 
 
@@ -103,9 +118,26 @@ def has_transcript(conn, video_id: str) -> bool:
 def save_transcript(conn, video_id: str, source: str, language: str | None, segments: list[dict]) -> None:
     text = " ".join(s["text"].strip() for s in segments if s["text"].strip())
     conn.execute(
-        "INSERT OR REPLACE INTO transcripts (video_id, source, language, text, segments) VALUES (?, ?, ?, ?, ?)",
-        (video_id, source, language, text, json.dumps(segments)),
+        """INSERT OR REPLACE INTO transcripts (video_id, source, language, text, segments, added_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (video_id, source, language, text, json.dumps(segments), int(time.time())),
     )
+    set_error(conn, video_id, None)
+
+
+def set_error(conn, video_id: str, error: str | None) -> None:
+    """Why a video still has no transcript ('whisper-wait', 'no-transcript', or the fetch error); None clears it."""
+    conn.execute("UPDATE videos SET error = ?, error_at = ? WHERE id = ?",
+                 (error, int(time.time()) if error else None, video_id))
+
+
+def get_kv(conn, key: str):
+    row = conn.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()
+    return json.loads(row["value"]) if row else None
+
+
+def set_kv(conn, key: str, value) -> None:
+    conn.execute("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", (key, json.dumps(value)))
 
 
 def pending(conn, collection: str | None = None) -> list[sqlite3.Row]:
@@ -123,7 +155,7 @@ def pending(conn, collection: str | None = None) -> list[sqlite3.Row]:
 def analysable(conn) -> list[dict]:
     """Every transcribed collection video, with its hermit slug and collection list."""
     rows = conn.execute(
-        """SELECT v.*, c.hermit, t.source, t.text, t.segments, GROUP_CONCAT(cv.collection, '|') AS collections
+        """SELECT v.*, c.hermit, t.source, t.text, t.segments, t.added_at, GROUP_CONCAT(cv.collection, '|') AS collections
            FROM videos v
            JOIN channels c ON c.id = v.channel
            JOIN transcripts t ON t.video_id = v.id
@@ -148,3 +180,17 @@ def status(conn) -> list[sqlite3.Row]:
            LEFT JOIN transcripts t ON t.video_id = v.id
            GROUP BY c.id, cv.collection ORDER BY cv.collection, c.name"""
     ).fetchall()
+
+
+def waiting(conn) -> list[dict]:
+    """Collection videos with no transcript yet, with their hermit, collections and last error."""
+    rows = conn.execute(
+        """SELECT v.id, v.title, v.upload_date, v.details_at, v.error, v.error_at, c.hermit,
+                  GROUP_CONCAT(cv.collection, '|') AS collections
+           FROM videos v JOIN channels c ON c.id = v.channel
+           JOIN collection_videos cv ON cv.video_id = v.id
+           LEFT JOIN transcripts t ON t.video_id = v.id
+           WHERE t.video_id IS NULL AND c.hermit IS NOT NULL
+           GROUP BY v.id ORDER BY v.upload_date DESC"""
+    ).fetchall()
+    return [{**dict(r), "collections": sorted(set(r["collections"].split("|")))} for r in rows]

@@ -7,12 +7,17 @@ Pick a season and any Hermits (or all of them) and see:
 
 | Tab | What's there |
 |---|---|
-| **Overview** | Episodes, hours, words spoken, views, likes; uploads per week; running word count; footage per Hermit; episode-length spread; upload weekdays |
-| **Words** | Word cloud; top words, two- and three-word phrases; each Hermit's *signature words* (log-odds against everyone else); themed vocabularies (mobs, materials, redstone, Hermitcraft life, exclamations, fillers) in total and per 10k words |
+| **Overview** | What's new since your last visit (episodes, Hermits talking about each other for the first time, words of the week); a downloadable share card per selected Hermit; episodes, hours, words spoken, views, likes; uploads per week; running word count; footage per Hermit; episode-length spread; upload weekdays |
+| **Words** | Word cloud; top words, two- and three-word phrases; each Hermit's *signature words* (log-odds against everyone else) and *catchphrases* (distinctive phrases ranked by how many of their episodes they're in); themed vocabularies (mobs, materials, redstone, Hermitcraft life, exclamations, fillers) in total and per 10k words |
 | **Interactions** | Network of who names whom on camera; mention matrix (per hour or total); who a Hermit talks about / who talks about them; top contacts over time; Hermits named in episode titles |
 | **Speech** | Pace, vocabulary richness (MATTR), filler words, exclamations, laughter; radar profile when comparing; usual openings and sign-offs |
 | **Videos** | Views by date and by length, length by episode number, likes per 1k views, sortable table of every episode |
-| **Search** | Any words or phrases: count per Hermit, trend over the season, and every moment with a link to that timestamp |
+| **Search** | Any words or phrases: count per Hermit, trend over the season, and every moment with a link to that timestamp; with nothing searched, a catchphrase leaderboard |
+
+Click an episode anywhere (Videos table or charts, search results, What's new) for its own page: its numbers
+against that Hermit's usual, who's named when (each dot links to that moment), pace through the episode, the
+words that stand out from their other episodes, and the transcript. **Status** (footer link) shows when the site
+was built, the last sync run, and every video still waiting for a transcript and why.
 
 Selecting 1–3 Hermits compares them side by side (each keeps one colour everywhere). Every chart has a
 **Table** view. The URL keeps the selection, so links can be shared.
@@ -35,6 +40,8 @@ fetching from the server wouldn't work anyway.
   target.
 - Each Hermit's season videos come from their channel's playlist whose title matches; channels without one
   fall back to uploads whose title matches. Livestream / shorts playlists are skipped.
+- `site/data/`: `videos.json` (one row per episode), `words/` and `transcripts/` and `episodes/` (one file per
+  Hermit, loaded when needed), `meta.json`, `status.json`.
 - A **mention** is another Hermit's name (or alias) spoken in an episode; the speaker's own name isn't counted.
   Auto-captions mishear names, so counts are close, not exact.
 
@@ -50,6 +57,7 @@ uv run hermit-stats update            # all three: sync, build, push
 uv run hermit-stats status            # videos / transcripts per Hermit
 uv run hermit-stats sync Grian Mumbo  # just some Hermits
 uv run hermit-stats import-ytlex ../ytlex/ytlex.db   # one-off: reuse ytlex transcripts
+uv run --extra dev pytest             # tests
 ```
 
 If YouTube says *"Sign in to confirm you're not a bot"*, `sync` stops early (everything fetched so far is

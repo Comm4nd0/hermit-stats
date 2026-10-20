@@ -107,6 +107,7 @@ def _fetch(vid: str, need_transcript: bool, args):
 def cmd_sync(args) -> int:
     cfg = _cfg(args)
     conn = db.connect(args.db)
+    started = int(time.time())
     hermits = [cfg.hermit(h) for h in args.hermit] if args.hermit else cfg.hermits
     if args.cookies and not args.cookies.is_file():
         console.print(f"[red]No cookies file at {args.cookies}[/]")
@@ -138,12 +139,15 @@ def cmd_sync(args) -> int:
         todo = todo[:args.limit]
     work = [(r, True) for r in todo] + [(r, False) for r in refresh]
     console.print(f"\n[bold]{len(todo)}[/] videos to transcribe, {len(refresh)} to refresh")
+    run = {"started": started, "todo": len(todo), "refresh": len(refresh), "processed": 0, "transcribed": 0,
+           "whispered": 0, "failed": 0, "bot_check": False}
     if not work:
+        _record_sync(conn, run)
         return 0
 
     whisper = Whisper(args.model, args.device, args.cache) if args.whisper != "never" else None
     known = {r["id"]: r["hermit"] for r in conn.execute("SELECT id, hermit FROM channels")}
-    done = failed = whispered = bot = 0
+    done = failed = whispered = transcribed = bot = 0
     progress = Progress(TextColumn("{task.description}"), BarColumn(), MofNCompleteColumn(),
                         TimeElapsedColumn(), console=console)
     with progress, ThreadPoolExecutor(args.workers) as pool:
@@ -169,17 +173,23 @@ def cmd_sync(args) -> int:
                         whispered += 1
                     if result is None and not budget_left:
                         progress.console.print(f"[dim]whisper limit reached, next run:[/] {meta['title']}")
+                        db.set_error(conn, r["id"], "whisper-wait")
                     elif result is None:
                         progress.console.print(f"[yellow]no transcript:[/] {meta['title']}")
+                        db.set_error(conn, r["id"], "no-transcript")
                     else:
                         db.save_transcript(conn, r["id"], *result)
+                        transcribed += 1
                 done += 1
             except Exception as e:   # private, members-only, premiere not started...
                 failed += 1
                 msg = str(e).splitlines()[0]
                 progress.console.print(f"[red]failed[/] {r['id']}: {msg[:150]}")
+                if need:
+                    db.set_error(conn, r["id"], msg[:500])
                 bot = bot + 1 if "not a bot" in msg else 0
                 if bot >= 5:
+                    run["bot_check"] = True
                     for f in futures:
                         f.cancel()
                     progress.console.print(
@@ -189,9 +199,17 @@ def cmd_sync(args) -> int:
             finally:
                 conn.commit()
                 progress.advance(task)
+    run.update(processed=done, transcribed=transcribed, whispered=whispered, failed=failed)
+    _record_sync(conn, run)
     console.print(f"\n[green]{done}[/] processed ({whispered} via Whisper), [red]{failed}[/] failed. "
                   f"Next: [bold]hermit-stats build[/]")
     return 0
+
+
+def _record_sync(conn, run: dict) -> None:
+    """Keep the run's summary for the site's status page."""
+    db.set_kv(conn, "last_sync", {**run, "finished": int(time.time())})
+    conn.commit()
 
 
 # ---------------------------------------------------------------- import

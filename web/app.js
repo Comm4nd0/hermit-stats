@@ -14,9 +14,10 @@ const sum = (a, f) => a.reduce((t, x) => t + (f(x) || 0), 0);
 const hours = s => s / 3600;
 const MAX_COMPARE = 3;
 
-const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '' };
+const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', ep: null };
 let META, VIDEOS, H = {};
-const cache = { words: {}, trans: {} };
+let VISIT = { prev: null };       // when this browser last looked (unix seconds), for "new since your last visit"
+const cache = { words: {}, trans: {}, eps: {} };
 const charts = [];
 
 /* ---------------------------------------------------------------- data access */
@@ -28,6 +29,17 @@ async function json(path) {
 }
 const words = slug => cache.words[slug] ??= json(`data/words/${slug}.json`);
 const transcripts = slug => cache.trans[slug] ??= json(`data/transcripts/${slug}.json`);
+const episodes = slug => cache.eps[slug] ??= json(`data/episodes/${slug}.json`);
+const statusData = () => cache.status ??= json('data/status.json');
+const ytUrl = (id, t) => `https://www.youtube.com/watch?v=${id}` + (t != null ? `&t=${Math.max(0, t - 2)}s` : '');
+const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const added = v => v.a ?? v.ts ?? 0;      // when the stats got the episode (older builds: its release time)
+const longDate = d => new Date(typeof d === 'number' ? d * 1000 : d + 'T00:00:00Z')
+  .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+function ago(ts) {
+  const s = Date.now() / 1000 - ts;
+  return s < 90 ? 'just now' : s < 5400 ? `${Math.round(s / 60)} minutes ago` : s < 129600 ? `${Math.round(s / 3600)} hours ago` : `${Math.round(s / 86400)} days ago`;
+}
 
 const collVids = () => VIDEOS.filter(v => v.c.includes(state.coll));
 const present = () => [...new Set(collVids().map(v => v.h))].sort((a, b) => H[a].short.localeCompare(H[b].short));
@@ -130,7 +142,7 @@ function card(container, spec) {
   }
 }
 
-/** Sortable table. cols: [{k, label, n (numeric), f (format), link (row => url)}] */
+/** Sortable table. cols: [{k, label, n (numeric), f (format), link (row => url), internal (link stays on the page)}] */
 function table({ cols, rows }) {
   const t = document.createElement('table');
   let sortK = null, dir = -1;
@@ -157,7 +169,8 @@ function table({ cols, rows }) {
         const val = c.f ? c.f(r[c.k], r) : (c.n ? full(r[c.k]) : r[c.k] ?? '');
         if (c.link) {
           const a = document.createElement('a');
-          a.href = c.link(r); a.target = '_blank'; a.rel = 'noopener'; a.textContent = val;
+          a.href = c.link(r); a.textContent = val;
+          if (!c.internal) { a.target = '_blank'; a.rel = 'noopener'; }
           td.appendChild(a);
         } else td.textContent = val;
       }
@@ -170,7 +183,7 @@ function table({ cols, rows }) {
 /** Ranked horizontal bars. items: [{name, value, slug?, extra?}] */
 /** zoom: start the axis near the smallest value (for rates that all sit in a narrow band) and show its scale.
     avg: a dashed line at the mean of the bars. */
-function hbar(items, { unit = '', top = 25, decimals, onSlug = true, valueLabel = true, zoom = false, avg = false } = {}) {
+function hbar(items, { unit = '', top = 25, decimals, onSlug = true, valueLabel = true, zoom = false, avg = false, labelWidth = 160 } = {}) {
   items = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value).slice(0, top);
   if (!items.length) return null;
   const show = v => decimals != null ? v.toFixed(decimals) : fmt(v);
@@ -188,7 +201,7 @@ function hbar(items, { unit = '', top = 25, decimals, onSlug = true, valueLabel 
         : tip(show(p.value) + (unit ? ' ' + unit : ''), p.name, items[p.dataIndex].extra || '') },
       xAxis: axis({ type: 'value', min, axisLabel: { show: zoom, color: css('--muted') }, splitLine: { show: zoom, lineStyle: { color: css('--grid') } } }),
       yAxis: axis({ type: 'category', inverse: true, data: items.map(i => i.name), axisLine: { show: false },
-        axisLabel: { color: css('--ink-2'), width: 160, overflow: 'truncate', ellipsis: '…' } }),
+        axisLabel: { color: css('--ink-2'), width: labelWidth, overflow: 'truncate', ellipsis: '…' } }),
       series: [{
         type: 'bar', barMaxWidth: 14, barCategoryGap: '30%',
         data: items.map(i => ({ value: i.value, itemStyle: { color: i.slug ? color(i.slug) : css('--s1'), borderRadius: [0, 4, 4, 0] } })),
@@ -252,12 +265,14 @@ const countByWeek = (list, val = () => 1) => { const m = {}; for (const v of lis
 function toggle(slug) {
   const i = state.sel.indexOf(slug);
   if (i >= 0) state.sel.splice(i, 1); else state.sel.push(slug);
+  state.ep = null;
   update();
 }
 
 /** Select exactly a team's members (those with videos this season); clicking the selected team clears it. */
 function selectTeam(members) {
   state.sel = teamPressed(members) ? [] : members.filter(s => present().includes(s));
+  state.ep = null;
   update();
 }
 const teamPressed = members => {
@@ -278,15 +293,23 @@ function readHash() {
   if (q.get('season') && META.collections.includes(q.get('season'))) state.coll = q.get('season');
   state.sel = (q.get('h') || '').split(',').filter(s => H[s]);
   state.search = q.get('q') || '';
+  state.ep = VIDEOS.some(v => v.id === q.get('ep')) ? q.get('ep') : null;
 }
-function writeHash() {
-  const q = new URLSearchParams();
-  q.set('tab', state.tab);
-  if (state.coll !== META.collections[0]) q.set('season', state.coll);
-  if (state.sel.length) q.set('h', state.sel.join(','));
-  if (state.tab === 'search' && state.search) q.set('q', state.search);
-  history.replaceState(null, '', '#' + q.toString());
+/** The URL hash for a state (the current one, or one with some fields changed). */
+function hashFor(changes = {}) {
+  const s = { ...state, ...changes }, q = new URLSearchParams();
+  q.set('tab', s.tab);
+  if (s.coll !== META.collections[0]) q.set('season', s.coll);
+  if (s.sel.length) q.set('h', s.sel.join(','));
+  if (s.tab === 'search' && s.search) q.set('q', s.search);
+  if (s.ep) q.set('ep', s.ep);
+  return '#' + q.toString();
 }
+function writeHash() { history.replaceState(null, '', hashFor()); }
+const epHref = id => hashFor({ ep: id });
+const searchHref = (phrase, sel = state.sel) => hashFor({ tab: 'search', search: phrase, sel, ep: null });
+/** Episode pages are real history entries, so the browser's Back button closes them. */
+function openEpisode(id) { location.hash = epHref(id); }
 
 function drawFilters() {
   const sel = $('#collection');
@@ -296,7 +319,7 @@ function drawFilters() {
   const all = document.createElement('button');
   all.type = 'button'; all.className = 'chip all'; all.textContent = 'All Hermits';
   all.setAttribute('aria-pressed', String(!state.sel.length));
-  all.onclick = () => { state.sel = []; update(); };
+  all.onclick = () => { state.sel = []; state.ep = null; update(); };
   box.appendChild(all);
   for (const slug of present()) {
     const h = H[slug];
@@ -336,8 +359,10 @@ function drawFilters() {
   const list = collVids();
   $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} Hermits`;
   $('#sel-summary').textContent = `${state.coll} · ${selectionLabel()}`;
-  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
-  for (const p of document.querySelectorAll('[data-panel]')) p.classList.toggle('on', p.dataset.panel === state.tab);
+  const panel = state.ep ? 'episode' : state.tab;
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === panel));
+  for (const p of document.querySelectorAll('[data-panel]')) p.classList.toggle('on', p.dataset.panel === panel);
+  document.body.classList.toggle('page-status', panel === 'status');     // the status page isn't per season or Hermit
 }
 
 let renderToken = 0;
@@ -347,7 +372,7 @@ async function update() {
   const token = ++renderToken;
   $('#main').classList.add('loading');
   try {
-    await TABS[state.tab]?.(token);
+    await (state.ep ? episodePage : TABS[state.tab])?.(token);
   } catch (e) {
     console.error(e);
   }
@@ -434,9 +459,24 @@ const TABS = {
       ['Words per minute', secs ? (w / (secs / 60)).toFixed(0) : '—'], ['Views', fmt(sum(list, v => v.v))],
       ['Likes', fmt(sum(list, v => v.l))], ['Times another Hermit is named', fmt(mentions)],
     ];
+    const sharing = comparing() ? state.sel.filter(s => present().includes(s)) : [];
+    const [docs, faces] = await Promise.all([Promise.all(sharing.map(words)), Promise.all(sharing.map(s => loadImage(H[s].avatar)))]);
     const el = reset('overview-cards', token);
     if (!el) return;
     tiles.innerHTML = t.map(([k, v]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+
+    const news = whatsNew();
+    if (news) card(el, { title: news.title, sub: news.sub, wide: true, build: () => ({ html: news.html }) });
+    if (sharing.length) {
+      card(el, { title: sharing.length === 1 ? 'Share card' : 'Share cards', wide: true,
+        sub: `${state.coll} in one picture, for Reddit, Discord or anywhere else`,
+        build: () => {
+          const wrap = document.createElement('div');
+          wrap.className = 'shares';
+          sharing.forEach((s, i) => wrap.appendChild(shareCard(s, docs[i]?.[state.coll], faces[i])));
+          return { node: wrap };
+        } });
+    }
 
     card(el, { title: 'Episodes per week', sub: comparing() ? 'Selected Hermits' : 'Uploads in this season, all selected Hermits combined',
       build: () => weekly(list, perHermitSeries(list, l => countByWeek(l), 'Episodes'), { type: 'bar' }) });
@@ -515,6 +555,22 @@ const TABS = {
         }).join('');
         return { html: `<div class="sigs">${html}</div>`,
           table: { cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'word', label: 'Word' }, { k: 'c', label: 'Times said', n: true }, { k: 'z', label: 'Distinctiveness (z)', n: true }], rows } };
+      } });
+
+    card(el, { title: 'Catchphrases', wide: true,
+      sub: 'Phrases each Hermit says far more than the others, in the most of their episodes · click one to search it',
+      build: () => {
+        const rows = [];
+        const html = scope().map(s => {
+          const d = all[present().indexOf(s)]?.[state.coll];
+          const ps = (d?.p || []).slice(0, 8);
+          for (const [p, z, c, n] of ps) rows.push({ hermit: name(s), phrase: p, c, n, z });
+          const img = H[s].avatar ? `<img src="${esc(H[s].avatar)}" alt="">` : '';
+          return `<div class="sig"><h4>${img}${esc(H[s].short)}</h4>${ps.map(([p, , c, n]) =>
+            `<a class="w" href="${esc(searchHref(p, []))}" title="said ${c} times, in ${n} episodes">${esc(p)}</a>`).join('') || '<span class="muted small">None yet</span>'}</div>`;
+        }).join('');
+        return { html: `<div class="sigs">${html}</div>`,
+          table: { cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'phrase', label: 'Phrase' }, { k: 'n', label: 'Episodes', n: true }, { k: 'c', label: 'Times said', n: true }, { k: 'z', label: 'Distinctiveness (z)', n: true }], rows } };
       } });
 
     const groupSel = document.createElement('select');
@@ -769,16 +825,17 @@ const TABS = {
           data: l.filter(v => yf(v) != null && xf(v) != null && (yType !== 'log' || yf(v) > 0)).map(v => ({ value: [xf(v), yf(v)], v })),
         })),
       },
-      onClick: p => window.open(`https://www.youtube.com/watch?v=${p.data.v.id}`, '_blank', 'noopener'),
+      onClick: p => openEpisode(p.data.v.id),
     });
-    card(el, { title: 'Views by upload date', sub: 'Each dot is an episode · click to watch · log scale · recent episodes are still collecting views', build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v, 'views', 'log') : null });
+    card(el, { title: 'Views by upload date', sub: 'Each dot is an episode · click one for its page · log scale · recent episodes are still collecting views', build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v, 'views', 'log') : null });
     card(el, { title: 'Views by episode length', sub: 'Do longer episodes get more views? · log scale', build: () => list.length ? scatter(v => Math.round(v.dur / 60), 'value', 'minutes', v => v.v, 'views', 'log') : null });
     card(el, { title: 'Episode length by episode number', sub: 'Minutes, as the season goes on', build: () => list.length ? scatter(v => v.ep, 'value', 'episode', v => Math.round(v.dur / 60), 'minutes') : null });
     card(el, { title: 'Likes per 1,000 views', sub: 'How much viewers liked each episode, relative to its reach',
       build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v && v.l != null ? +(1000 * v.l / v.v).toFixed(1) : null, 'likes / 1k views') : null });
-    card(el, { title: 'Every episode', wide: true, sub: 'Click a column to sort; titles open the video',
+    card(el, { title: 'Every episode', wide: true, sub: 'Click a column to sort; a title opens that episode’s stats',
       build: () => ({ tableOnly: true, table: {
-        cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'd', label: 'Date' }, { k: 't', label: 'Title', link: r => `https://www.youtube.com/watch?v=${r.id}` },
+        cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'd', label: 'Date' }, { k: 't', label: 'Title', link: r => epHref(r.id), internal: true },
+          { k: 'watch', label: '', link: r => ytUrl(r.id), f: () => 'Watch' },
           { k: 'min', label: 'Minutes', n: true }, { k: 'v', label: 'Views', n: true }, { k: 'l', label: 'Likes', n: true }, { k: 'cm', label: 'Comments', n: true },
           { k: 'w', label: 'Words', n: true }, { k: 'wpm', label: 'Words/min', n: true }, { k: 'mentions', label: 'Hermits named', n: true }, { k: 'top', label: 'Most named' }],
         rows: [...list].sort((a, b) => (b.d || '').localeCompare(a.d || '')).map(v => {
@@ -793,7 +850,7 @@ const TABS = {
     const phrases = state.search.split(',').map(p => tokenize(p)).filter(p => p.length).slice(0, 3);
     $('#search-examples').hidden = !!phrases.length;
     searchBusy(null);
-    if (!phrases.length) { reset('search-cards', token); return; }
+    if (!phrases.length) return catchphraseBoard(token);
     const list = vids(), slugs = [...new Set(list.map(v => v.h))];
     let loaded = 0;
     const progress = () => searchBusy(loaded < slugs.length
@@ -868,10 +925,12 @@ const TABS = {
           const meta = document.createElement('div');
           meta.className = 'meta';
           const a = document.createElement('a');
-          a.href = `https://www.youtube.com/watch?v=${h.v.id}&t=${Math.max(0, h.start - 2)}s`;
+          a.href = ytUrl(h.v.id, h.start);
           a.target = '_blank'; a.rel = 'noopener';
-          a.textContent = `${Math.floor(h.start / 60)}:${String(h.start % 60).padStart(2, '0')}`;
-          meta.append(`${H[h.v.h].short} · ${h.v.d} · `, a, ` · ${h.v.t}`);
+          a.textContent = clock(h.start);
+          const ep = document.createElement('a');
+          ep.href = epHref(h.v.id); ep.textContent = h.v.t; ep.className = 'ep-link';
+          meta.append(`${H[h.v.h].short} · ${h.v.d} · `, a, ' · ', ep);
           const p = document.createElement('div');
           p.innerHTML = highlight(excerpt(h.text, phrases[h.i]), phrases[h.i]);
           li.append(meta, p);
@@ -881,6 +940,328 @@ const TABS = {
       } });
   },
 };
+
+/* ---------------------------------------------------------------- what's new */
+
+const byNewest = (a, b) => (b.d || '').localeCompare(a.d || '') || (b.ts || 0) - (a.ts || 0);
+
+/** Episodes since this browser's last visit (or, with none, the season's last week of uploads), pairs of
+    Hermits talking about each other for the first time in that stretch, and the words of the week. */
+function whatsNew() {
+  const list = vids(), wk = META.week?.[state.coll];
+  const fresh = VISIT.prev ? list.filter(v => added(v) > VISIT.prev) : [];
+  let title, sub, eps, from;
+  if (fresh.length) {
+    eps = fresh; from = new Date(VISIT.prev * 1000).toISOString().slice(0, 10);
+    title = 'New since your last visit';
+    sub = `${fresh.length} episode${fresh.length === 1 ? '' : 's'} added since ${longDate(VISIT.prev)}`;
+  } else if (wk) {
+    eps = list.filter(v => v.d && v.d >= wk.from); from = wk.from;
+    title = Date.now() - Date.parse(wk.to + 'T00:00:00Z') < 8 * 86400e3 ? 'This week' : 'The last week of uploads';
+    sub = `${longDate(wk.from)} – ${longDate(wk.to)}` + (VISIT.prev ? ' · nothing new since your last visit' : '');
+  } else return null;
+  eps = [...eps].sort(byNewest);
+
+  // First episode of the season where one Hermit names another (twice or more: one could be a mishearing).
+  const first = {};
+  for (const v of [...collVids()].sort((a, b) => byNewest(b, a)))
+    for (const [k, c] of Object.entries(v.m)) if (H[k] && c >= 2) first[v.h + '>' + k] ??= v;
+  const sc = new Set(scope());
+  const firsts = Object.entries(first).filter(([k, v]) => v.d && v.d >= from && (sc.has(v.h) || sc.has(k.split('>')[1])))
+    .sort((a, b) => byNewest(a[1], b[1])).slice(0, 8);
+
+  const face = s => H[s]?.avatar ? `<img src="${esc(H[s].avatar)}" alt="" loading="lazy">` : '<span class="dot"></span>';
+  const epList = eps.length ? `<ul class="news-list">${eps.slice(0, 8).map(v => `<li>${face(v.h)}<div><a href="${esc(epHref(v.id))}">${esc(v.t)}</a>
+      <div class="muted small">${esc(name(v.h))} · ${esc(longDate(v.d))}</div></div></li>`).join('')}</ul>
+      ${eps.length > 8 ? `<a class="small" href="${esc(hashFor({ tab: 'videos', ep: null }))}">and ${eps.length - 8} more in Videos</a>` : ''}`
+    : '<p class="muted small">No episodes from the selected Hermits in this stretch.</p>';
+  const pairList = firsts.length ? `<ul class="news-list">${firsts.map(([k, v]) => {
+      const b = k.split('>')[1];
+      return `<li>${face(v.h)}<div>${esc(name(v.h))} talks about ${esc(name(b))} <span class="muted">(${v.m[b]} times)</span>
+        <div class="muted small"><a href="${esc(epHref(v.id))}">${esc(longDate(v.d))}</a></div></div></li>`;
+    }).join('')}</ul>` : '<p class="muted small">No new pairs in this stretch.</p>';
+  const ww = wk?.words?.length ? `<div class="phrases">${wk.words.map(([w, , c]) => `<a class="w" href="${esc(searchHref(w))}" title="said ${c} times that week">${esc(w)}</a>`).join('')}</div>
+      <p class="muted small">Said far more from ${esc(longDate(wk.from))} to ${esc(longDate(wk.to))} than earlier in the season, by all Hermits · click one to search it</p>`
+    : '<p class="muted small">Not enough that week to say.</p>';
+  return { title, sub, html: `<div class="news">
+    <div><h4>Episodes</h4>${epList}</div>
+    <div><h4>Talking about each other for the first time this season</h4>${pairList}</div>
+    <div><h4>Words of the week</h4>${ww}</div></div>` };
+}
+
+/* ---------------------------------------------------------------- share cards */
+
+const loadImage = src => !src ? Promise.resolve(null) : new Promise(res => {
+  const img = new Image();
+  img.onload = () => res(img); img.onerror = () => res(null); img.src = src;
+});
+
+/** Shorten text with an ellipsis until it fits maxW on the canvas. */
+function fitText(ctx, s, maxW) {
+  if (ctx.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+  return s.trimEnd() + '…';
+}
+
+/** A 1200×630 picture of a Hermit's season (the size link previews use), with Download and Share buttons. */
+function shareCard(slug, doc, img) {
+  const m = hermitMetrics()[slug], all = collVids();
+  const top = c => { const e = Object.entries(c).filter(([s, n]) => H[s] && s !== slug && n > 0).sort((a, b) => b[1] - a[1])[0]; return e ? `${name(e[0])} (${full(e[1])} times)` : null; };
+  const by = {};
+  for (const v of all) if (v.h !== slug && v.m[slug]) by[v.h] = (by[v.h] || 0) + v.m[slug];
+  const facts = [['Signature word', doc?.x?.[0]?.[0]], ['Catchphrase', doc?.p?.[0] ? `“${doc.p[0][0]}”` : null],
+    ['Talks about most', top(mentionsGiven(all.filter(v => v.h === slug)))], ['Most talked about by', top(by)]].filter(f => f[1]);
+  const stats = [[fmt(m.videos), 'episodes'], [fmt(Math.round(m.hours)), 'hours of footage'], [fmt(m.words), 'words spoken'], [m.wpm ? m.wpm.toFixed(0) : '—', 'words a minute']];
+
+  const W = 1200, HT = 630, F = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = HT; cv.className = 'share-canvas';
+  cv.setAttribute('role', 'img');
+  cv.setAttribute('aria-label', `${H[slug].name}, ${state.coll}: ` + [...stats.map(([v, k]) => `${v} ${k}`), ...facts.map(([k, v]) => `${k} ${v}`)].join(', '));
+  const x = cv.getContext('2d');
+  x.fillStyle = css('--surface'); x.fillRect(0, 0, W, HT);
+  x.fillStyle = color(slug); x.fillRect(0, 0, W, 12);
+  if (img) {
+    x.save(); x.beginPath(); x.arc(64 + 68, 64 + 68, 68, 0, 2 * Math.PI); x.clip(); x.drawImage(img, 64, 64, 136, 136); x.restore();
+  }
+  const text = (s, px, weight, ink, tx, ty, maxW) => { x.font = `${weight} ${px}px ${F}`; x.fillStyle = css(ink); x.fillText(maxW ? fitText(x, s, maxW) : s, tx, ty); };
+  const left = img ? 232 : 64;
+  text(H[slug].name, 64, 700, '--ink', left, 132, W - left - 64);
+  text(`Hermitcraft ${state.coll}`, 30, 400, '--ink-2', left, 180);
+  stats.forEach(([v, k], i) => { text(v, 56, 650, '--ink', 64 + i * 272, 306); text(k, 24, 400, '--ink-2', 64 + i * 272, 342, 250); });
+  x.fillStyle = css('--grid'); x.fillRect(64, 378, W - 128, 2);
+  facts.forEach(([k, v], i) => {
+    const fx = 64 + (i % 2) * 560, fy = 428 + Math.floor(i / 2) * 92;
+    text(k, 22, 400, '--muted', fx, fy); text(v, 34, 600, '--ink', fx, fy + 40, 520);
+  });
+  text((META.site || location.origin).replace(/^https?:\/\//, ''), 22, 600, '--accent', 64, 598);
+  x.textAlign = 'right';
+  text('From every episode’s captions · unofficial fan project', 20, 400, '--muted', W - 64, 598);
+
+  const file = `hermit-stats-${slug}-${state.coll.toLowerCase().replace(/\W+/g, '-')}.png`;
+  const blob = () => new Promise(res => cv.toBlob(res, 'image/png'));
+  const wrap = document.createElement('figure');
+  wrap.className = 'share';
+  const bar = document.createElement('figcaption');
+  const dl = document.createElement('button');
+  dl.type = 'button'; dl.className = 'ghost'; dl.textContent = 'Download PNG';
+  dl.onclick = async () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await blob()); a.download = file; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  bar.appendChild(dl);
+  if (navigator.canShare?.({ files: [new File([''], file, { type: 'image/png' })] })) {
+    const sh = document.createElement('button');
+    sh.type = 'button'; sh.className = 'ghost'; sh.textContent = 'Share…';
+    sh.onclick = async () => {
+      const f = new File([await blob()], file, { type: 'image/png' });
+      navigator.share({ files: [f], title: `${H[slug].name} · Hermit Stats`, text: location.href }).catch(() => { /* cancelled */ });
+    };
+    bar.appendChild(sh);
+  }
+  wrap.append(cv, bar);
+  return wrap;
+}
+
+/* ---------------------------------------------------------------- one episode */
+
+const TAB_NAMES = { overview: 'Overview', search: 'Search', words: 'Words', interactions: 'Interactions', speech: 'Speech', videos: 'Videos', status: 'Status' };
+
+async function episodePage(token) {
+  const v = VIDEOS.find(x => x.id === state.ep);
+  const [tr, ex] = await Promise.all([transcripts(v.h), episodes(v.h)]);
+  const el = reset('episode-cards', token);
+  if (!el) return;
+  const coll = v.c.includes(state.coll) ? state.coll : v.c[0];
+  const mine = VIDEOS.filter(x => x.h === v.h && x.c.includes(coll)).sort((a, b) => (a.d || '').localeCompare(b.d || '') || (a.ts || 0) - (b.ts || 0));
+  const i = mine.indexOf(v), prev = mine[i - 1], next = mine[i + 1];
+  const chunks = tr[v.id] || [], extra = ex[v.id] || { mt: [], x: [] };
+  const h = H[v.h], mins = v.dur / 60;
+  const src = { 'auto-captions': 'auto-captions', 'manual-captions': 'creator’s captions', whisper: 'Whisper transcript' }[v.src] || v.src;
+
+  const head = $('#episode-head');
+  head.innerHTML = `<div class="ep-nav"><button type="button" class="ghost" id="ep-back">← ${esc(TAB_NAMES[state.tab] || 'Back')}</button>
+      <span class="ep-step">${prev ? `<a href="${esc(epHref(prev.id))}" title="${esc(prev.t)}">← Previous</a>` : ''}
+      ${next ? `<a href="${esc(epHref(next.id))}" title="${esc(next.t)}">Next →</a>` : ''}</span></div>
+    <div class="ep-title">${h.avatar ? `<img src="${esc(h.avatar)}" alt="">` : ''}
+      <div><h2>${esc(v.t)}</h2>
+      <p class="muted small">${esc(h.short)} · ${esc(coll)}${v.ep ? ` · episode ${v.ep}` : ''} · ${esc(longDate(v.d))} · ${Math.round(mins)} min · ${esc(src)}</p></div>
+      <a class="watch" href="${esc(ytUrl(v.id))}" target="_blank" rel="noopener">Watch on YouTube</a></div>`;
+  $('#ep-back').onclick = () => { state.ep = null; update(); };
+
+  // Each number next to this Hermit's usual for the season.
+  const avg = f => { const xs = mine.map(f).filter(x => x != null && isFinite(x)); return xs.length ? sum(xs, x => x) / xs.length : null; };
+  const named = x => sum(Object.values(x.m), c => c);
+  const likes = x => x.v && x.l != null ? 1000 * x.l / x.v : null;
+  const tiles = [
+    ['Words spoken', x => x.w, fmt], ['Words per minute', x => x.wpm, n => n.toFixed(0)],
+    ['Vocabulary richness', x => x.r != null ? 100 * x.r : null, n => n.toFixed(1)], ['Minutes', x => x.dur / 60, n => n.toFixed(0)],
+    ['Hermits named', named, fmt], ['Views', x => x.v, fmt], ['Likes per 1k views', likes, n => n.toFixed(1)],
+  ];
+  $('#episode-tiles').innerHTML = tiles.map(([k, f, show]) => {
+    const val = f(v), usual = avg(f);
+    let cmp = '';
+    if (val != null && usual) {
+      const d = 100 * (val - usual) / usual;
+      cmp = Math.abs(d) < 5 ? 'about usual' : `${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(0)}% vs usual`;
+    }
+    return `<div class="tile"><div class="v">${esc(val == null ? '—' : show(val))}</div><div class="k">${esc(k)}</div>${cmp ? `<div class="cmp small muted" title="${esc(h.short)}’s average this season: ${esc(usual == null ? '—' : show(usual))}">${esc(cmp)}</div>` : ''}</div>`;
+  }).join('');
+
+  card(el, { title: 'Who’s named, and when', wide: true, sub: 'Each dot is a time another Hermit is named · click one to watch from there',
+    build: () => {
+      const counts = {};
+      for (const [, s] of extra.mt) if (H[s]) counts[s] = (counts[s] || 0) + 1;
+      const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+      if (!cats.length) return { empty: 'No other Hermit is named in this episode.' };
+      const pts = extra.mt.filter(([, s]) => H[s]);
+      return {
+        height: Math.max(160, cats.length * 30 + 60),
+        option: {
+          ...base(),
+          grid: { ...base().grid, right: 24, bottom: 24 },
+          tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(name(p.data.s), `at ${clock(p.data.t)}`) },
+          xAxis: axis({ type: 'value', min: 0, max: Math.ceil(mins), name: 'minutes', nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: css('--muted') } }),
+          yAxis: axis({ type: 'category', inverse: true, data: cats.map(s => `${name(s)} (${counts[s]})`), axisLine: { show: false }, axisLabel: { color: css('--ink-2') }, splitLine: { show: true, lineStyle: { color: css('--grid') } } }),
+          series: [{ type: 'scatter', symbolSize: 10, itemStyle: { color: css('--s1'), opacity: 0.8, borderColor: css('--surface'), borderWidth: 1.5 },
+            data: pts.map(([t, s]) => ({ value: [+(t / 60).toFixed(2), cats.indexOf(s)], t, s })) }],
+        },
+        onClick: p => window.open(ytUrl(v.id, p.data.t), '_blank', 'noopener'),
+        table: { cols: [{ k: 'name', label: 'Hermit' }, { k: 'n', label: 'Times named', n: true }, { k: 'first', label: 'First at' }, { k: 'last', label: 'Last at' }],
+          rows: cats.map(s => { const ts = pts.filter(p => p[1] === s).map(p => p[0]); return { name: name(s), n: counts[s], first: clock(ts[0]), last: clock(ts[ts.length - 1]) }; }) },
+      };
+    } });
+
+  card(el, { title: 'Pace through the episode', sub: `Words per minute, two minutes at a time · dashed line: ${h.short}’s average this season`,
+    build: () => {
+      const bins = [];
+      for (const [t, text] of chunks) { const b = Math.floor(t / 120); bins[b] = (bins[b] || 0) + tokenize(text).length; }
+      if (!bins.length) return null;
+      const data = [...bins].map((n, b) => [b * 2, +((n || 0) / 2).toFixed(0)]);
+      const usual = avg(x => x.wpm);
+      return {
+        option: {
+          ...base(),
+          tooltip: { ...base().tooltip, trigger: 'axis', formatter: ps => tip(ps[0].value[1] + ' words / min', `from ${ps[0].value[0]}:00`) },
+          xAxis: axis({ type: 'value', min: 0, name: 'minutes', nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: css('--muted') } }),
+          yAxis: axis({ type: 'value' }),
+          series: [{ type: 'line', data, showSymbol: false, step: 'end', lineStyle: { width: 2, color: color(v.h) }, itemStyle: { color: color(v.h) },
+            markLine: usual ? { symbol: 'none', silent: true, data: [{ yAxis: +usual.toFixed(0) }], lineStyle: { color: css('--ink-2'), type: 'dashed', width: 1 },
+              label: { formatter: `avg ${usual.toFixed(0)}`, color: css('--ink-2'), fontSize: 11 } } : undefined }],
+        },
+        table: { cols: [{ k: 'from', label: 'From' }, { k: 'wpm', label: 'Words / min', n: true }], rows: data.map(([m, w]) => ({ from: `${m}:00`, wpm: w })) },
+      };
+    } });
+
+  card(el, { title: 'Words that stand out', sub: `Said far more here than in ${h.short}’s other ${coll} episodes · click one to search it`,
+    build: () => {
+      if (!extra.x.length) return { empty: 'Nothing stands out from their other episodes.' };
+      return { html: `<div class="phrases">${extra.x.map(([w, , c]) => `<a class="w" href="${esc(searchHref(w, [v.h]))}" title="said ${c} times">${esc(w)}</a>`).join('')}</div>`,
+        table: { cols: [{ k: 'w', label: 'Word' }, { k: 'c', label: 'Times said', n: true }, { k: 'z', label: 'Distinctiveness (z)', n: true }],
+          rows: extra.x.map(([w, z, c]) => ({ w, z, c })) } };
+    } });
+
+  card(el, { title: 'Transcript', wide: true, sub: `${src[0].toUpperCase() + src.slice(1)}, in 20-second stretches · click a time to watch from there`,
+    build: () => {
+      if (!chunks.length) return null;
+      const ul = document.createElement('ul');
+      ul.className = 'kwic transcript';
+      for (const [t, text] of chunks) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = ytUrl(v.id, t); a.target = '_blank'; a.rel = 'noopener'; a.textContent = clock(t); a.className = 'meta';
+        li.append(a, ' ', text);
+        ul.appendChild(li);
+      }
+      return { node: ul };
+    } });
+}
+
+/* ---------------------------------------------------------------- status */
+
+/** How the nightly job is doing: when the site was built, the last sync, and videos still without a transcript. */
+TABS.status = async function (token) {
+  const st = await statusData();
+  const el = reset('status-cards', token);
+  if (!el) return;
+  const run = st.sync, now = Date.now() / 1000, DAY = 86400;
+  const problems = [];
+  if (now - st.generated > 1.5 * DAY) problems.push(`the site was last built ${ago(st.generated)}`);
+  if (!run) problems.push('no sync run has been recorded yet');
+  else {
+    if (now - run.finished > 1.5 * DAY) problems.push(`the last sync finished ${ago(run.finished)}`);
+    if (run.bot_check) problems.push('YouTube bot-checked the last sync, so it stopped early');
+    if (run.failed) problems.push(`${run.failed} video${run.failed === 1 ? '' : 's'} failed in the last sync`);
+  }
+  $('#status-head').innerHTML = `<div class="health ${problems.length ? 'warn' : 'ok'}" role="status"><b>${problems.length ? 'Needs a look' : 'All good'}</b>
+    <span>${problems.length ? esc(problems.join('; ')) + '.' : 'Built and synced in the last day, nothing failed.'}</span></div>`;
+
+  const why = {};
+  for (const w of st.waiting) why[w.why] = (why[w.why] || 0) + 1;
+  const tiles = [
+    ['Site built', ago(st.generated)], ['Last sync finished', run ? ago(run.finished) : '—'],
+    ['Last sync took', run ? `${Math.max(1, Math.round((run.finished - run.started) / 60))} min` : '—'],
+    ['Transcribed last sync', run?.transcribed != null ? `${full(run.transcribed)} of ${full(run.todo)}` : '—'],
+    ['Via Whisper last sync', run ? full(run.whispered) : '—'], ['Waiting for a transcript', full(st.waiting.length)],
+    ['Waiting for Whisper', full(why['Waiting for Whisper'] || 0)], ['Episodes in the stats', full(VIDEOS.length)],
+  ];
+  $('#status-tiles').innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+
+  card(el, { title: 'Why videos are waiting', sub: 'Videos found in a season playlist that have no transcript yet',
+    build: () => st.waiting.length ? hbar(Object.entries(why).map(([n, value]) => ({ name: n, value })), { unit: 'videos', onSlug: false, labelWidth: 220 })
+      : { empty: 'Every video found has a transcript.' } });
+  card(el, { title: 'Where transcripts come from', sub: 'Every episode in the stats, by season',
+    build: () => {
+      const label = { 'auto-captions': 'YouTube auto-captions', 'manual-captions': 'Creator’s captions', whisper: 'Whisper (no captions)' };
+      const rows = META.collections.map(c => {
+        const l = VIDEOS.filter(v => v.c.includes(c)), r = { name: c };
+        for (const k of Object.keys(label)) r[k] = l.filter(v => v.src === k).length;
+        return r;
+      }).filter(r => Object.keys(label).some(k => r[k]));
+      return { tableOnly: true, table: { cols: [{ k: 'name', label: 'Season' }, ...Object.entries(label).map(([k, l]) => ({ k, label: l, n: true }))], rows } };
+    } });
+  card(el, { title: 'Waiting for a transcript', wide: true, sub: 'Newest first · the nightly run retries these',
+    build: () => st.waiting.length ? { tableOnly: true, table: {
+      cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'season', label: 'Season' }, { k: 'd', label: 'Uploaded' },
+        { k: 't', label: 'Title', link: r => ytUrl(r.id) }, { k: 'why', label: 'Why' }, { k: 'since', label: 'Since' }],
+      rows: st.waiting.map(w => ({ ...w, hermit: name(w.h), season: w.c.join(', '), t: w.t || w.id, since: w.at ? ago(w.at) : '' })) } } : null });
+  card(el, { title: 'Episodes by Hermit', wide: true, sub: 'Transcribed episodes in the stats and videos still waiting, per season',
+    build: () => {
+      const rows = [];
+      for (const c of META.collections) for (const h of META.hermits) {
+        const have = VIDEOS.filter(v => v.h === h.slug && v.c.includes(c)).length, wait = st.waiting.filter(w => w.h === h.slug && w.c.includes(c)).length;
+        if (have || wait) rows.push({ season: c, hermit: h.short, have, wait, whisper: VIDEOS.filter(v => v.h === h.slug && v.c.includes(c) && v.src === 'whisper').length });
+      }
+      return { tableOnly: true, table: { cols: [{ k: 'season', label: 'Season' }, { k: 'hermit', label: 'Hermit' }, { k: 'have', label: 'In the stats', n: true },
+        { k: 'wait', label: 'Waiting', n: true }, { k: 'whisper', label: 'Via Whisper', n: true }], rows } };
+    } });
+};
+
+/** With nothing searched: each Hermit's top catchphrase, ranked by how many of their episodes it's in. */
+async function catchphraseBoard(token) {
+  const slugs = scope();
+  const docs = await Promise.all(slugs.map(words));
+  const el = reset('search-cards', token);
+  if (!el) return;
+  const eps = byHermit(collVids());
+  const items = slugs.map((s, i) => {
+    const p = docs[i]?.[state.coll]?.p?.[0], n = eps[s]?.length || 0;
+    return p && n ? { name: `${name(s)}: “${p[0]}”`, slug: s, phrase: p[0], value: 100 * p[3] / n,
+      extra: `<br>in ${p[3]} of ${n} episodes · said ${full(p[2])} times` } : null;
+  }).filter(Boolean);
+  card(el, { title: 'Catchphrase leaderboard', wide: true,
+    sub: 'Each Hermit’s most characteristic phrase and the share of their episodes it’s in · click one to search it',
+    build: () => {
+      const r = hbar(items, { unit: '% of episodes', decimals: 0, onSlug: false, top: 40, labelWidth: 300 });
+      if (!r) return { empty: 'No catchphrases for this selection yet.' };
+      const sorted = [...items].sort((a, b) => b.value - a.value);
+      r.onClick = p => { location.hash = searchHref(sorted[p.dataIndex].phrase, []); };
+      r.table = { cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'phrase', label: 'Catchphrase', link: x => searchHref(x.phrase, []), internal: true },
+        { k: 'value', label: '% of episodes', n: true, f: v => v.toFixed(0) }], rows: sorted.map(x => ({ ...x, hermit: name(x.slug) })) };
+      return r;
+    } });
+}
 
 function searchBusy(msg) {
   const status = $('#search-status'), btn = $('#search-form button');
@@ -951,16 +1332,27 @@ function applyTheme(t) {
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
 }
 
+/** Remember when this browser last looked. Reloads within a few hours count as the same visit, so what's
+    new doesn't vanish on refresh. */
+function readVisit() {
+  try {
+    const now = Math.floor(Date.now() / 1000), v = JSON.parse(localStorage.getItem('visit') || '{}');
+    VISIT.prev = v.seen && now - v.seen < 6 * 3600 ? v.prev ?? null : v.seen ?? null;
+    localStorage.setItem('visit', JSON.stringify({ seen: now, prev: VISIT.prev }));
+  } catch { /* storage blocked: everything counts as this week */ }
+}
+
 async function boot() {
   try { applyTheme(localStorage.getItem('theme')); } catch { /* storage blocked */ }
+  readVisit();
   [META, VIDEOS] = await Promise.all([json('data/meta.json'), json('data/videos.json')]);
   for (const h of META.hermits) H[h.slug] = h;
   state.coll = META.collections.find(c => VIDEOS.some(v => v.c.includes(c))) || META.collections[0];
   readHash();
   $('#updated').textContent = `Updated ${new Date(META.generated * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 
-  $('#collection').onchange = e => { state.coll = e.target.value; state.sel = state.sel.filter(s => present().includes(s)); update(); };
-  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; if (scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 }); update(); };
+  $('#collection').onchange = e => { state.coll = e.target.value; state.sel = state.sel.filter(s => present().includes(s)); state.ep = null; update(); };
+  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; state.ep = null; if (scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 }); update(); };
   $('#search-form').onsubmit = e => { e.preventDefault(); state.search = $('#search-input').value.trim(); update(); };
   $('#theme').onclick = () => {
     const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -970,7 +1362,12 @@ async function boot() {
     update();
   };
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => update());
-  addEventListener('hashchange', () => { readHash(); update(); });     // pasted / shared links
+  addEventListener('hashchange', () => {     // pasted / shared links, episode links, Back
+    const was = [state.ep, state.tab];
+    readHash();
+    if (state.ep !== was[0] || state.tab !== was[1]) scrollTo({ top: 0 });
+    update();
+  });
   let rt;
   addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => charts.forEach(c => c.resize()), 120); });
   // Once scrolled into the charts, fold the filters into one line so the tabs stay in reach.
