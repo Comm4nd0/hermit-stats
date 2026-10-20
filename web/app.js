@@ -792,11 +792,29 @@ const TABS = {
     input.value = state.search;
     const phrases = state.search.split(',').map(p => tokenize(p)).filter(p => p.length).slice(0, 3);
     $('#search-examples').hidden = !!phrases.length;
+    searchBusy(null);
     if (!phrases.length) { reset('search-cards', token); return; }
     const list = vids(), slugs = [...new Set(list.map(v => v.h))];
-    const docs = Object.fromEntries(await Promise.all(slugs.map(async s => [s, await transcripts(s)])));
+    let loaded = 0;
+    const progress = () => searchBusy(loaded < slugs.length
+      ? `Loading transcripts… ${loaded} of ${slugs.length} Hermits` : `Searching ${full(list.length)} episodes…`);
+    progress();
+    let docs;
+    try {
+      docs = Object.fromEntries(await Promise.all(slugs.map(async s => {
+        const d = await transcripts(s);
+        loaded++;
+        if (token === renderToken) progress();
+        return [s, d];
+      })));
+      await new Promise(r => setTimeout(r, 20));    // let the status paint before the synchronous count
+    } catch (e) {
+      if (token === renderToken) searchBusy(null);
+      throw e;
+    }
     const el = reset('search-cards', token);
     if (!el) return;
+    searchBusy(null);
     const labels = phrases.map(p => p.join(' '));
     const hits = [];       // {v, start, text, p}
     const perVideo = phrases.map(() => new Map());
@@ -863,6 +881,14 @@ const TABS = {
       } });
   },
 };
+
+function searchBusy(msg) {
+  const status = $('#search-status'), btn = $('#search-form button');
+  status.hidden = !msg;
+  status.lastElementChild.textContent = msg || '';
+  btn.disabled = !!msg;
+  btn.textContent = msg ? 'Searching…' : 'Search';
+}
 
 function boxplot(slugs, f, unit) {
   const g = byHermit(vids());
