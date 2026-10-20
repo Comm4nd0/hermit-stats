@@ -233,6 +233,16 @@ function toggle(slug) {
   update();
 }
 
+/** Select exactly a team's members (those with videos this season); clicking the selected team clears it. */
+function selectTeam(members) {
+  state.sel = teamPressed(members) ? [] : members.filter(s => present().includes(s));
+  update();
+}
+const teamPressed = members => {
+  const m = members.filter(s => present().includes(s));
+  return m.length > 0 && m.length === state.sel.length && m.every(s => state.sel.includes(s));
+};
+
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   if (q.get('tab')) state.tab = q.get('tab');
@@ -272,6 +282,18 @@ function drawFilters() {
     }
     b.onclick = () => toggle(slug);
     box.appendChild(b);
+  }
+  const teams = Object.entries(META.teams?.[state.coll] ?? {});
+  const tbox = $('#teams');
+  tbox.innerHTML = '';
+  tbox.hidden = !teams.length;
+  for (const [team, members] of teams) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip all'; b.textContent = team;
+    b.title = members.map(name).join(', ');
+    b.setAttribute('aria-pressed', String(teamPressed(members)));
+    b.onclick = () => selectTeam(members);
+    tbox.appendChild(b);
   }
   $('#sel-hint').textContent = !state.sel.length ? '— all of them; pick up to 3 to compare'
     : state.sel.length > MAX_COMPARE ? `— ${state.sel.length} selected, shown together` : '— click again to deselect';

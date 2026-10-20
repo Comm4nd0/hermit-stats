@@ -179,6 +179,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
         "generated": int(time.time()),
         "site": cfg.site_url,
         "collections": [c.name for c in cfg.collections],
+        "teams": {c.name: c.teams for c in cfg.collections if c.teams},
         "hermits": roster,
         "lexicon": text.LEXICON,
     }

@@ -4,7 +4,8 @@
 #                 found from their channel's playlists whose title matches `playlist`; if a channel has
 #                 no matching playlist, their uploads whose title matches `video_title` are used instead.
 #                 Both are case-insensitive regular expressions. Playlists / titles matching `skip` (livestreams,
-#                 shorts) are left out, and so is anything uploaded before `starts`.
+#                 shorts) are left out, and so is anything uploaded before `starts`. `teams` (optional) names
+#                 groups of Hermits that can be selected together: { "Team" = ["Hermit name", ...] }.
 #
 # [[hermit]]      one YouTube channel; `short` is the name used on charts. `aliases` are what other Hermits call them on camera (plus common
 #                 auto-caption mishearings); a spoken alias in someone else's video counts as a mention.
@@ -21,6 +22,13 @@ playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(11|xi)\b'
 video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(11|xi)\b'
 skip = 'stream|shorts|\blive\b'
 starts = "2025-11-01"
+
+[collection.teams]
+"C-Team" = ["Mumbo Jumbo", "Rendog", "Skizzleman", "VintageBeef"]
+"EGGZ" = ["Etho", "GeminiTay", "Grian", "ZombieCleo"]
+"Fire Department" = ["PearlescentMoon", "impulseSV", "Mumbo Jumbo", "FalseSymmetry", "Joe Hills"]
+"Frenemies" = ["SmallishBeans", "BdoubleO100", "Docm77", "GoodTimesWithScar"]
+"ZITS" = ["Zedaph", "impulseSV", "Tango Tek", "Skizzleman"]
 
 [[collection]]
 name = "Season 10"

@@ -13,6 +13,7 @@ class Collection:
     video_title: re.Pattern | None
     skip: re.Pattern | None = None
     starts: str | None = None          # YYYYMMDD; earlier uploads are never in the collection
+    teams: dict[str, list[str]] = field(default_factory=dict)   # team name -> member slugs
 
     def wants(self, title: str, upload_date: str | None = None) -> bool:
         if self.skip and self.skip.search(title or ""):
@@ -77,4 +78,7 @@ def load(path: Path) -> Config:
                       [e.lower() for e in h.get("exclude", [])], h.get("playlists", {}), h.get("short") or h["name"])
                for h in raw.get("hermit", [])]
     deploy = raw.get("deploy", {})
-    return Config(collections, hermits, deploy.get("target"), deploy.get("url"))
+    cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"))
+    for c, rc in zip(collections, raw.get("collection", [])):
+        c.teams = {team: [cfg.hermit(m).slug for m in members] for team, members in rc.get("teams", {}).items()}
+    return cfg

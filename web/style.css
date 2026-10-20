@@ -75,6 +75,9 @@ button, select, input { font: inherit; color: inherit; }
 .chip:hover { background: var(--wash); }
 .chip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .chip .key { width: 12px; height: 3px; border-radius: 2px; }
+.teams { margin-top: 2px; }
+.teams[hidden] { display: none; }
+.teams::before { content: 'Teams'; align-self: center; font-size: 13px; color: var(--ink-2); margin-right: 4px; }
 
 .tabs {
   display: flex; gap: 4px; overflow-x: auto; max-width: 1440px; margin: 0 auto; padding: 12px 24px 0;
