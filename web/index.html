@@ -19,10 +19,16 @@
     <h1>Hermit Stats</h1>
     <p id="summary" class="muted">Loading…</p>
   </div>
-  <button id="theme" class="ghost" type="button" aria-label="Toggle dark mode">◐</button>
+  <button id="theme" class="ghost" type="button" aria-label="Switch between light and dark" title="Switch between light and dark">◐ Theme</button>
 </header>
 
+<div id="bar-anchor"></div>
+<div id="bar" class="bar">
 <div class="filters" role="region" aria-label="Filters">
+  <div class="sel-line">
+    <span id="sel-summary"></span>
+    <button id="sel-edit" class="ghost" type="button">Change</button>
+  </div>
   <label class="field">Season
     <select id="collection"></select>
   </label>
@@ -35,12 +41,13 @@
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button role="tab" data-tab="overview">Overview</button>
+  <button role="tab" data-tab="search">Search</button>
   <button role="tab" data-tab="words">Words</button>
   <button role="tab" data-tab="interactions">Interactions</button>
   <button role="tab" data-tab="speech">Speech</button>
   <button role="tab" data-tab="videos">Videos</button>
-  <button role="tab" data-tab="search">Search</button>
 </nav>
+</div>
 
 <main id="main">
   <section data-panel="overview">
@@ -57,6 +64,15 @@
       <button type="submit">Search</button>
     </form>
     <p class="muted small" id="search-hint">Counts every time a word or phrase is said in the selected Hermits' episodes, and lists each moment with a link straight to it.</p>
+    <div id="search-examples" class="examples">
+      <span class="muted small">Try:</span>
+      <button type="button" class="chip all">diamonds</button>
+      <button type="button" class="chip all">oh no</button>
+      <button type="button" class="chip all">mumbo</button>
+      <button type="button" class="chip all">redstone, command blocks</button>
+      <button type="button" class="chip all">let's go</button>
+      <button type="button" class="chip all">shopping district</button>
+    </div>
     <div class="grid" id="search-cards"></div>
   </section>
 </main>

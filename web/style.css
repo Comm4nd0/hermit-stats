@@ -51,15 +51,22 @@ button, select, input { font: inherit; color: inherit; }
 .top h1 { margin: 0; font-size: 26px; letter-spacing: -0.01em; }
 .top p { margin: 2px 0 0; }
 .ghost {
-  background: none; border: 1px solid var(--ring); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+  background: none; border: 1px solid var(--ring); border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap;
 }
 .ghost:hover { background: var(--wash); }
 
+.bar { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--ring); }
 .filters {
-  position: sticky; top: 0; z-index: 5; background: var(--page);
   display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;
-  max-width: 1440px; margin: 0 auto; padding: 12px 24px; border-bottom: 1px solid var(--ring);
+  max-width: 1440px; margin: 0 auto; padding: 12px 24px;
 }
+/* Folded once scrolled into the charts: one line saying what's selected, plus the tabs. */
+.sel-line { display: none; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); min-width: 0; }
+.sel-line span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-line .ghost { padding: 2px 10px; font-size: 13px; flex-shrink: 0; }
+.bar.compact .filters { padding-top: 8px; padding-bottom: 8px; }
+.bar.compact .filters > .field { display: none; }
+.bar.compact .sel-line { display: flex; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); }
 .field.grow { flex: 1; min-width: 0; }
 .field select {
@@ -77,10 +84,15 @@ button, select, input { font: inherit; color: inherit; }
 .chip .key { width: 12px; height: 3px; border-radius: 2px; }
 .teams { margin-top: 2px; }
 .teams[hidden] { display: none; }
-.teams::before { content: 'Teams'; align-self: center; font-size: 13px; color: var(--ink-2); margin-right: 4px; }
+.teams::before { content: 'Teams'; align-self: center; font-size: 13px; color: var(--ink-2); margin-right: 4px; flex-shrink: 0; }
+.chip.team { border-style: dashed; padding-left: 4px; }
+.chip.team[aria-pressed="true"] { border-style: solid; }
+.chip .faces { display: inline-flex; }
+.chip .faces img { width: 18px; height: 18px; margin-left: -6px; border: 1.5px solid var(--surface); }
+.chip .faces img:first-child { margin-left: 0; }
 
 .tabs {
-  display: flex; gap: 4px; overflow-x: auto; max-width: 1440px; margin: 0 auto; padding: 12px 24px 0;
+  display: flex; gap: 4px; overflow-x: auto; max-width: 1440px; margin: 0 auto; padding: 4px 24px 0;
 }
 .tabs button {
   background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; cursor: pointer;
@@ -131,6 +143,8 @@ tr:hover td { background: var(--wash); }
 .search { display: flex; gap: 8px; margin-bottom: 6px; }
 .search input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--ring); border-radius: 10px; background: var(--surface); }
 .search button { padding: 9px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+.examples { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 16px; }
+.examples[hidden] { display: none; }
 .kwic { list-style: none; margin: 8px 0 0; padding: 0; max-height: 560px; overflow: auto; }
 .kwic li { padding: 8px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
 .kwic .meta { font-size: 12px; color: var(--muted); }
@@ -143,7 +157,15 @@ footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 32px; }
 
 @media (max-width: 640px) {
   .top, .filters, .tabs, main, footer { padding-left: 16px; padding-right: 16px; }
-  .filters { position: static; }
+  /* one swipeable row of chips per group instead of eight wrapped rows */
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { min-height: 40px; padding-right: 12px; flex-shrink: 0; }
+  .filters { gap: 10px; }
+  .field.grow { flex-basis: 100%; }
+  .tabs { scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .field select { min-height: 40px; }
   .chart { height: 320px; }
   .tile .v { font-size: 22px; }
 }

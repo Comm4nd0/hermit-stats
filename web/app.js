@@ -34,7 +34,8 @@ const present = () => [...new Set(collVids().map(v => v.h))].sort((a, b) => H[a]
 const scope = () => state.sel.length ? state.sel : present();           // hermits the charts cover
 const vids = () => { const s = new Set(scope()); return collVids().filter(v => s.has(v.h)); };
 const comparing = () => state.sel.length >= 1 && state.sel.length <= MAX_COMPARE;
-const color = slug => { const i = state.sel.indexOf(slug); return i >= 0 && i < MAX_COMPARE ? css(`--s${i + 1}`) : css('--s1'); };
+const color = slug => { const i = comparing() ? state.sel.indexOf(slug) : -1; return i >= 0 ? css(`--s${i + 1}`) : css('--s1'); };
+const seasonTeams = () => Object.entries(META.teams?.[state.coll] ?? {});
 const byHermit = list => { const m = {}; for (const v of list) (m[v.h] ??= []).push(v); return m; };
 const name = slug => H[slug]?.short ?? slug;
 
@@ -68,8 +69,17 @@ function base() {
 }
 const axis = extra => ({
   axisLine: { lineStyle: { color: css('--axis') } }, axisTick: { show: false },
-  axisLabel: { color: css('--muted') }, splitLine: { lineStyle: { color: css('--grid') } }, ...extra,
+  splitLine: { lineStyle: { color: css('--grid') } }, ...extra,
+  axisLabel: { color: css('--muted'), hideOverlap: true, ...extra?.axisLabel },
 });
+/** The heatmap colour at t (0–1) along the --seq ramp, and black or white text that reads on it. */
+function cellColor(t) {
+  const stops = [0, 1, 2, 3, 4].map(i => css(`--seq-${i}`)), x = Math.min(3.999, Math.max(0, t) * 4), i = Math.floor(x), f = x - i;
+  const rgb = h => [1, 3, 5].map(j => parseInt(h.slice(j, j + 2), 16));
+  const a = rgb(stops[i]), b = rgb(stops[i + 1]);
+  return a.map((c, j) => c + (b[j] - c) * f);
+}
+const inkOn = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#0b0b0b' : '#ffffff';
 const tip = (value, label, extra = '') => `<div class="hovercard"><b>${esc(value)}</b> ${esc(label)}${extra}</div>`;
 const legend = () => ({ top: 0, left: 0, icon: 'roundRect', itemWidth: 14, itemHeight: 4, textStyle: { color: css('--ink-2') } });
 
@@ -158,23 +168,35 @@ function table({ cols, rows }) {
 }
 
 /** Ranked horizontal bars. items: [{name, value, slug?, extra?}] */
-function hbar(items, { unit = '', top = 25, decimals, onSlug = true, valueLabel = true } = {}) {
+/** zoom: start the axis near the smallest value (for rates that all sit in a narrow band) and show its scale.
+    avg: a dashed line at the mean of the bars. */
+function hbar(items, { unit = '', top = 25, decimals, onSlug = true, valueLabel = true, zoom = false, avg = false } = {}) {
   items = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value).slice(0, top);
   if (!items.length) return null;
   const show = v => decimals != null ? v.toFixed(decimals) : fmt(v);
+  const lo = items[items.length - 1].value, hi = items[0].value;
+  const step = 10 ** Math.floor(Math.log10(hi - lo || 1));
+  const min = zoom && items.length > 1 ? Math.max(0, Math.floor((lo - (hi - lo) * 0.5) / step) * step) : 0;
+  const mean = sum(items, i => i.value) / items.length;
   return {
-    height: Math.max(160, items.length * 24 + 24),
+    height: Math.max(160, items.length * 24 + 24) + (zoom ? 24 : 0),
     option: {
       ...base(),
-      tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(show(p.value) + (unit ? ' ' + unit : ''), p.name, items[p.dataIndex].extra || '') },
-      xAxis: axis({ type: 'value', axisLabel: { show: false }, splitLine: { show: false } }),
+      grid: { ...base().grid, left: 16, top: avg ? 28 : 16 },
+      tooltip: { ...base().tooltip, trigger: 'item', formatter: p => p.componentType === 'markLine'
+        ? tip(show(p.value) + (unit ? ' ' + unit : ''), 'average')
+        : tip(show(p.value) + (unit ? ' ' + unit : ''), p.name, items[p.dataIndex].extra || '') },
+      xAxis: axis({ type: 'value', min, axisLabel: { show: zoom, color: css('--muted') }, splitLine: { show: zoom, lineStyle: { color: css('--grid') } } }),
       yAxis: axis({ type: 'category', inverse: true, data: items.map(i => i.name), axisLine: { show: false },
-        axisLabel: { color: css('--ink-2'), width: 150, overflow: 'truncate' } }),
+        axisLabel: { color: css('--ink-2'), width: 160, overflow: 'truncate', ellipsis: '…' } }),
       series: [{
         type: 'bar', barMaxWidth: 14, barCategoryGap: '30%',
         data: items.map(i => ({ value: i.value, itemStyle: { color: i.slug ? color(i.slug) : css('--s1'), borderRadius: [0, 4, 4, 0] } })),
         label: { show: valueLabel, position: 'right', color: css('--ink-2'), fontSize: 12, formatter: p => show(p.value) },
         emphasis: { itemStyle: { opacity: 0.85 } },
+        markLine: avg && items.length > 2 ? { silent: false, symbol: 'none', data: [{ xAxis: +mean.toFixed(3) }],
+          lineStyle: { color: css('--ink-2'), type: 'dashed', width: 1 },
+          label: { position: 'start', formatter: `avg ${show(mean)}`, color: css('--ink-2'), fontSize: 11 } } : undefined,
       }],
     },
     onClick: onSlug ? p => { const s = items[p.dataIndex]?.slug; if (s) toggle(s); } : null,
@@ -243,6 +265,13 @@ const teamPressed = members => {
   return m.length > 0 && m.length === state.sel.length && m.every(s => state.sel.includes(s));
 };
 
+function selectionLabel() {
+  if (!state.sel.length) return 'All Hermits';
+  const team = seasonTeams().find(([, m]) => teamPressed(m));
+  if (team) return `${team[0]} (${state.sel.length} Hermits)`;
+  return state.sel.length <= MAX_COMPARE ? state.sel.map(name).join(', ') : `${state.sel.length} Hermits`;
+}
+
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   if (q.get('tab')) state.tab = q.get('tab');
@@ -283,20 +312,30 @@ function drawFilters() {
     b.onclick = () => toggle(slug);
     box.appendChild(b);
   }
-  const teams = Object.entries(META.teams?.[state.coll] ?? {});
+  const teams = seasonTeams();
   const tbox = $('#teams');
   tbox.innerHTML = '';
   tbox.hidden = !teams.length;
   for (const [team, members] of teams) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip all'; b.textContent = team;
+    b.type = 'button'; b.className = 'chip team';
     b.title = members.map(name).join(', ');
     b.setAttribute('aria-pressed', String(teamPressed(members)));
+    const faces = document.createElement('span');
+    faces.className = 'faces';
+    for (const s of members) {
+      if (!H[s]?.avatar) continue;
+      const img = new Image(); img.src = H[s].avatar; img.alt = ''; img.loading = 'lazy'; faces.appendChild(img);
+    }
+    b.append(faces, team);
     b.onclick = () => selectTeam(members);
     tbox.appendChild(b);
   }
   $('#sel-hint').textContent = !state.sel.length ? '— all of them; pick up to 3 to compare'
     : state.sel.length > MAX_COMPARE ? `— ${state.sel.length} selected, shown together` : '— click again to deselect';
+  const list = collVids();
+  $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} Hermits`;
+  $('#sel-summary').textContent = `${state.coll} · ${selectionLabel()}`;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
   for (const p of document.querySelectorAll('[data-panel]')) p.classList.toggle('on', p.dataset.panel === state.tab);
 }
@@ -338,8 +377,12 @@ async function aggregateWords(slugs) {
     for (const [k, c] of d.t) t[k] = (t[k] || 0) + c;
   }
   const top = (m, k) => Object.entries(m).sort((x, y) => y[1] - x[1]).slice(0, k);
-  return { n, w: top(w, 150), b: top(b, 25), t: top(t, 25), docs };
+  return { n, w: top(w, 150), b: top(b, 80).filter(([k]) => !noise(k)), t: top(t, 80).filter(([k]) => !noise(k)), docs };
 }
+
+// Phrases that are just sound effects or hesitation: one word repeated ("da da da") or only fillers ("mm hm mm").
+const NOISE = new Set(['mm', 'hm', 'hmm', 'mhm', 'um', 'uh', 'ah', 'oh', 'eh', 'huh']);
+const noise = phrase => { const ws = phrase.split(' '); return new Set(ws).size === 1 || ws.every(w => NOISE.has(w)); };
 
 function lexTotals(list, group) {
   const m = {};
@@ -387,7 +430,7 @@ const TABS = {
     const secs = sum(list, v => v.dur), w = sum(list, v => v.w);
     const mentions = sum(list, v => sum(Object.values(v.m), x => x));
     const t = [
-      ['Episodes', fmt(list.length)], ['Hours of footage', fmt(hours(secs))], ['Words spoken', fmt(w)],
+      ['Episodes', fmt(list.length)], ['Hours of footage', fmt(Math.round(hours(secs)))], ['Words spoken', fmt(w)],
       ['Words per minute', secs ? (w / (secs / 60)).toFixed(0) : '—'], ['Views', fmt(sum(list, v => v.v))],
       ['Likes', fmt(sum(list, v => v.l))], ['Times another Hermit is named', fmt(mentions)],
     ];
@@ -406,6 +449,24 @@ const TABS = {
       build: () => boxplot(scope(), v => v.dur / 60, 'minutes') });
     card(el, { title: 'Total views', sub: 'Across this season’s episodes',
       build: () => hbar(pick(m, 'views'), { unit: 'views' }) });
+    const teams = seasonTeams();
+    if (teams.length) {
+      card(el, { title: 'Teams', sub: 'Average views per episode for each team’s members · click a bar to select the team',
+        build: () => {
+          const g = byHermit(collVids());
+          const rows = teams.map(([t, members]) => {
+            const l = members.flatMap(s => g[s] || []), secs = sum(l, v => v.dur), w = sum(l, v => v.w);
+            return { name: t, members, value: l.length ? sum(l, v => v.v) / l.length : 0, eps: l.length, hours: hours(secs), wpm: secs ? w / (secs / 60) : 0 };
+          });
+          const r = hbar(rows, { unit: 'views per episode', onSlug: false });
+          if (!r) return r;
+          const sorted = rows.filter(x => x.value > 0).sort((a, b) => b.value - a.value);
+          r.onClick = p => selectTeam(sorted[p.dataIndex].members);
+          r.table = { cols: [{ k: 'name', label: 'Team' }, { k: 'eps', label: 'Episodes', n: true }, { k: 'hours', label: 'Hours', n: true, f: v => v.toFixed(0) },
+            { k: 'value', label: 'Views / episode', n: true, f: v => fmt(v) }, { k: 'wpm', label: 'Words / min', n: true, f: v => v.toFixed(0) }], rows: sorted };
+          return r;
+        } });
+    }
     card(el, { title: 'Upload days', sub: 'Which weekday episodes come out (UTC)',
       build: () => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -438,8 +499,8 @@ const TABS = {
         table: { cols: [{ k: 'name', label: 'Word' }, { k: 'value', label: 'Times said', n: true }], rows: agg.w.map(([name, value]) => ({ name, value })) },
       } : null });
     card(el, { title: 'Top words', build: () => hbar(agg.w.map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false }) });
-    card(el, { title: 'Top two-word phrases', build: () => hbar(agg.b.map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false, top: 20 }) });
-    card(el, { title: 'Top three-word phrases', build: () => hbar(agg.t.map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false, top: 20 }) });
+    card(el, { title: 'Top two-word phrases', sub: 'Repeated sounds like “da da” left out', build: () => hbar(agg.b.map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false, top: 20 }) });
+    card(el, { title: 'Top three-word phrases', wide: true, sub: 'Repeated sounds like “da da da” left out', build: () => hbar(agg.t.map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false, top: 20 }) });
 
     card(el, { title: 'Signature words', wide: true,
       sub: 'Words each Hermit uses far more than the others this season (log-odds against everyone else)',
@@ -482,7 +543,7 @@ const TABS = {
     for (const v of all) for (const [k, c] of Object.entries(v.m)) if (H[k]) pair[v.h + '>' + k] = (pair[v.h + '>' + k] || 0) + c;
 
     card(el, { title: 'Who talks about whom', wide: true, height: 560,
-      sub: 'Line thickness = how often two Hermits name each other on camera; circle size = how often a Hermit is named. Drag to rearrange, click to select.',
+      sub: 'Each Hermit’s three most-named connections (all of them for selected Hermits). Line thickness = how often the two name each other on camera; circle size = how often a Hermit is named. Drag to rearrange, click to select.',
       build: () => {
         const nodesSet = new Set(ps);
         for (const k of Object.keys(pair)) { const b = k.split('>')[1]; if (H[b]) nodesSet.add(b); }
@@ -492,14 +553,17 @@ const TABS = {
         for (const [k, c] of Object.entries(pair)) { const [a, b] = k.split('>'); const key = [a, b].sort().join('|'); und[key] = (und[key] || 0) + c; }
         const edges = Object.entries(und).sort((x, y) => y[1] - x[1]);
         const maxE = edges[0]?.[1] || 1, maxR = Math.max(1, ...Object.values(received));
-        const keep = edges.filter(([k, c], i) => i < 90 || k.split('|').some(s => sel.has(s)));
+        const strongest = new Set();
+        for (const s of nodesSet) edges.filter(([k]) => k.split('|').includes(s)).slice(0, 3).forEach(([k]) => strongest.add(k));
+        const keep = edges.filter(([k]) => strongest.has(k) || k.split('|').some(s => sel.has(s)));
         const muted = css('--muted');
         const nodes = [...nodesSet].map(s => ({
           id: s, name: name(s), value: received[s] || 0,
           symbolSize: 14 + 38 * Math.sqrt((received[s] || 0) / maxR),
           itemStyle: { color: sel.size ? (sel.has(s) ? color(s) : muted) : css('--s1'), borderColor: css('--surface'), borderWidth: 2,
             opacity: ps.includes(s) ? 1 : 0.5 },
-          label: { show: true, position: 'right', color: css('--ink-2'), fontSize: 12 },
+          label: { show: true, position: 'right', distance: 6, color: css('--ink-2'), fontSize: 12,
+            textBorderColor: css('--surface'), textBorderWidth: 3 },
         }));
         const links = keep.map(([k, c]) => {
           const [a, b] = k.split('|'), hot = !sel.size || sel.has(a) || sel.has(b);
@@ -515,8 +579,8 @@ const TABS = {
                 `<br>${esc(name(p.data.target))} → ${esc(name(p.data.source))}: ${full(pair[p.data.target + '>' + p.data.source] || 0)}`)
               : tip(full(p.data.value), `times ${p.data.name} is named by others`) },
             series: [{
-              type: 'graph', layout: 'force', roam: true, draggable: true, data: nodes, links,
-              force: { repulsion: 420, edgeLength: [60, 220], gravity: 0.08, friction: 0.2 },
+              type: 'graph', layout: 'force', roam: false, draggable: true, data: nodes, links,
+              force: { repulsion: 450, edgeLength: [60, 180], gravity: 0.15, friction: 0.2 },
               emphasis: { focus: 'adjacency', lineStyle: { opacity: 0.9 } }, labelLayout: { hideOverlap: true },
             }],
           },
@@ -562,6 +626,43 @@ const TABS = {
         };
       } });
 
+    const teams = seasonTeams();
+    if (teams.length) {
+      card(el, { title: 'Team talk', wide: true,
+        sub: 'Row = whose episodes, column = which team gets named · mentions per hour of the row team’s footage. Hermits on two teams count for both; nobody counts their own name.',
+        height: teams.length * 40 + 110,
+        build: () => {
+          const data = [];
+          let max = 0;
+          const raw = teams.map(([, a]) => teams.map(([, b]) => sum(a, x => sum(b, y => x === y ? 0 : pair[x + '>' + y] || 0))));
+          const th = teams.map(([, a]) => sum(a, x => hrs[x] || 0));
+          teams.forEach((_, y) => teams.forEach((_, x) => {
+            const v = th[y] ? raw[y][x] / th[y] : 0;
+            max = Math.max(max, v);
+            data.push([x, y, +v.toFixed(2), raw[y][x]]);
+          }));
+          const tn = teams.map(([t]) => t);
+          return {
+            option: {
+              ...base(),
+              grid: { left: 8, right: 16, top: 8, bottom: 48, containLabel: true },
+              tooltip: { ...base().tooltip, formatter: p => tip(p.value[2].toFixed(2) + ' / hour', `${tn[p.value[0]]} named in ${tn[p.value[1]]}’s episodes`, `<br>${full(p.value[3])} times in total`) },
+              xAxis: axis({ type: 'category', data: tn, axisLabel: { color: css('--ink-2'), interval: 0 }, axisLine: { show: false } }),
+              yAxis: axis({ type: 'category', data: tn, inverse: true, axisLabel: { color: css('--ink-2') }, axisLine: { show: false } }),
+              visualMap: { dimension: 2, min: 0, max: max || 1, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 140,
+                text: ['more', 'fewer'], textStyle: { color: css('--muted') },
+                inRange: { color: [css('--seq-0'), css('--seq-1'), css('--seq-2'), css('--seq-3'), css('--seq-4')] } },
+              series: [{ type: 'heatmap', data: data.map(d => ({ value: d, label: { color: inkOn(cellColor(d[2] / (max || 1))) } })),
+                label: { show: true, fontWeight: 600, formatter: p => p.data.value[2].toFixed(1) },
+                itemStyle: { borderColor: css('--surface'), borderWidth: 2, borderRadius: 3 }, emphasis: { itemStyle: { borderColor: css('--ink') } } }],
+            },
+            onClick: p => selectTeam(teams[p.value[1]][1]),
+            table: { cols: [{ k: 'a', label: 'In episodes of' }, ...tn.map((t, i) => ({ k: 'c' + i, label: t, n: true, f: v => v.toFixed(2) }))],
+              rows: tn.map((t, y) => Object.fromEntries([['a', t], ...tn.map((_, x) => ['c' + x, th[y] ? raw[y][x] / th[y] : 0])])) },
+          };
+        } });
+    }
+
     const given = mentionsGiven(list);
     card(el, { title: state.sel.length ? `Who ${state.sel.length === 1 ? name(state.sel[0]) + ' talks' : 'they talk'} about` : 'Who gets talked about most',
       sub: state.sel.length ? 'Times each Hermit is named in the selected episodes' : 'Times each Hermit is named in someone else’s episodes',
@@ -596,20 +697,20 @@ const TABS = {
     if (!el) return;
     const m = hermitMetrics(), list = vids();
     card(el, { title: 'Speaking pace', sub: 'Words per minute of footage (silence and music count, so it’s lower than conversation pace)',
-      build: () => hbar(pick(m, 'wpm'), { unit: 'words / min', decimals: 0 }) });
+      build: () => hbar(pick(m, 'wpm'), { unit: 'words / min', decimals: 0, zoom: true, avg: true }) });
     card(el, { title: 'Vocabulary richness', sub: 'Different words per 100, averaged over every 500-word stretch (fair across episode lengths)',
-      build: () => hbar(pick(m, 'richness'), { unit: 'per 100 words', decimals: 1 }) });
+      build: () => hbar(pick(m, 'richness'), { unit: 'per 100 words', decimals: 1, zoom: true, avg: true }) });
     card(el, { title: 'Filler words', sub: 'Um, uh, like, you know, I mean, basically… per 1,000 words',
-      build: () => hbar(pick(m, 'fillers'), { unit: 'per 1,000 words', decimals: 1 }) });
+      build: () => hbar(pick(m, 'fillers'), { unit: 'per 1,000 words', decimals: 1, avg: true }) });
     card(el, { title: 'Which fillers', sub: 'Most-used filler words in the selected episodes',
       build: () => hbar(Object.entries(lexTotals(list, 'Fillers')).map(([name, value]) => ({ name, value })), { unit: 'times', onSlug: false }) });
     card(el, { title: 'Exclamations', sub: 'Oh no, wow, let’s go… per 1,000 words',
       build: () => hbar(scope().filter(s => m[s]).map(s => {
         const l = list.filter(v => v.h === s), n = sum(Object.values(lexTotals(l, 'Exclamations')), x => x);
         return { name: name(s), slug: s, value: m[s].words ? 1000 * n / m[s].words : 0 };
-      }), { unit: 'per 1,000 words', decimals: 1 }) });
+      }), { unit: 'per 1,000 words', decimals: 1, avg: true }) });
     card(el, { title: 'Laughter', sub: 'Times the captions mark [Laughter], per hour of footage',
-      build: () => hbar(pick(m, 'laughs'), { unit: 'per hour', decimals: 1 }) });
+      build: () => hbar(pick(m, 'laughs'), { unit: 'per hour', decimals: 1, avg: true }) });
 
     if (comparing()) {
       card(el, { title: 'Profile', sub: 'Each axis scaled to the highest Hermit this season', height: 400,
@@ -655,23 +756,23 @@ const TABS = {
     if (!el) return;
     const list = vids();
     const groups = comparing() ? state.sel.map(s => [s, list.filter(v => v.h === s)]) : [[null, list]];
-    const scatter = (xf, xType, xName, yf, yName) => ({
+    const scatter = (xf, xType, xName, yf, yName, yType = 'value') => ({
       option: {
         ...base(), legend: groups.length > 1 ? legend() : undefined,
         grid: { ...base().grid, top: groups.length > 1 ? 32 : 16 },
         tooltip: { ...base().tooltip, trigger: 'item', formatter: p => { const v = p.data.v; return tip(full(yf(v)) + ' ' + yName, `· ${H[v.h].short}`, `<br>${esc(v.t)}<br><span class="muted">${esc(v.d)} · ${Math.round(v.dur / 60)} min</span>`); } },
         xAxis: axis({ type: xType, name: xName, nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: css('--muted') }, splitLine: { show: xType !== 'time', lineStyle: { color: css('--grid') } } }),
-        yAxis: axis({ type: 'value', name: yName, nameTextStyle: { color: css('--muted'), align: 'left' }, axisLabel: { color: css('--muted'), formatter: v => fmt(v) } }),
+        yAxis: axis({ type: yType, name: yName, nameTextStyle: { color: css('--muted'), align: 'left' }, axisLabel: { color: css('--muted'), formatter: v => fmt(v) } }),
         series: groups.map(([s, l]) => ({
           type: 'scatter', name: s ? name(s) : 'Episodes', symbolSize: 8,
           itemStyle: { color: s ? color(s) : css('--s1'), opacity: 0.75, borderColor: css('--surface'), borderWidth: 2 },
-          data: l.filter(v => yf(v) != null && xf(v) != null).map(v => ({ value: [xf(v), yf(v)], v })),
+          data: l.filter(v => yf(v) != null && xf(v) != null && (yType !== 'log' || yf(v) > 0)).map(v => ({ value: [xf(v), yf(v)], v })),
         })),
       },
       onClick: p => window.open(`https://www.youtube.com/watch?v=${p.data.v.id}`, '_blank', 'noopener'),
     });
-    card(el, { title: 'Views by upload date', sub: 'Each dot is an episode · click to watch', build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v, 'views') : null });
-    card(el, { title: 'Views by episode length', sub: 'Do longer episodes get more views?', build: () => list.length ? scatter(v => Math.round(v.dur / 60), 'value', 'minutes', v => v.v, 'views') : null });
+    card(el, { title: 'Views by upload date', sub: 'Each dot is an episode · click to watch · log scale · recent episodes are still collecting views', build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v, 'views', 'log') : null });
+    card(el, { title: 'Views by episode length', sub: 'Do longer episodes get more views? · log scale', build: () => list.length ? scatter(v => Math.round(v.dur / 60), 'value', 'minutes', v => v.v, 'views', 'log') : null });
     card(el, { title: 'Episode length by episode number', sub: 'Minutes, as the season goes on', build: () => list.length ? scatter(v => v.ep, 'value', 'episode', v => Math.round(v.dur / 60), 'minutes') : null });
     card(el, { title: 'Likes per 1,000 views', sub: 'How much viewers liked each episode, relative to its reach',
       build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v && v.l != null ? +(1000 * v.l / v.v).toFixed(1) : null, 'likes / 1k views') : null });
@@ -690,6 +791,7 @@ const TABS = {
     const input = $('#search-input');
     input.value = state.search;
     const phrases = state.search.split(',').map(p => tokenize(p)).filter(p => p.length).slice(0, 3);
+    $('#search-examples').hidden = !!phrases.length;
     if (!phrases.length) { reset('search-cards', token); return; }
     const list = vids(), slugs = [...new Set(list.map(v => v.h))];
     const docs = Object.fromEntries(await Promise.all(slugs.map(async s => [s, await transcripts(s)])));
@@ -829,12 +931,10 @@ async function boot() {
   for (const h of META.hermits) H[h.slug] = h;
   state.coll = META.collections.find(c => VIDEOS.some(v => v.c.includes(c))) || META.collections[0];
   readHash();
-  const n = VIDEOS.length, hrs = hours(sum(VIDEOS, v => v.dur));
-  $('#summary').textContent = `${full(n)} episodes · ${full(Math.round(hrs))} hours · ${present().length} Hermits`;
   $('#updated').textContent = `Updated ${new Date(META.generated * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 
   $('#collection').onchange = e => { state.coll = e.target.value; state.sel = state.sel.filter(s => present().includes(s)); update(); };
-  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; update(); };
+  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; if (scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 }); update(); };
   $('#search-form').onsubmit = e => { e.preventDefault(); state.search = $('#search-input').value.trim(); update(); };
   $('#theme').onclick = () => {
     const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -847,6 +947,15 @@ async function boot() {
   addEventListener('hashchange', () => { readHash(); update(); });     // pasted / shared links
   let rt;
   addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => charts.forEach(c => c.resize()), 120); });
+  // Once scrolled into the charts, fold the filters into one line so the tabs stay in reach.
+  // Different thresholds for folding and unfolding, so the bar's change in height can't make it flicker.
+  const bar = $('#bar');
+  addEventListener('scroll', () => {
+    const y = scrollY, top = $('#bar-anchor').offsetTop;
+    if (y > top + 160) bar.classList.add('compact'); else if (y < top + 8) bar.classList.remove('compact');
+  }, { passive: true });
+  $('#sel-edit').onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
+  for (const b of document.querySelectorAll('.examples button')) b.onclick = () => { state.search = b.textContent; update(); };
   update();
 }
 
