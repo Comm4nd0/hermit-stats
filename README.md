@@ -20,13 +20,14 @@ Selecting 1–3 Hermits compares them side by side (each keeps one colour everyw
 ## How it works
 
 ```
-home PC (GPU, residential IP)                         Luma001 (Hetzner)
+CT 112 on Proxmox pve1 (home IP)                      Luma001 (Hetzner)
   yt-dlp: playlists, metadata, captions                Caddy file_server
   faster-whisper when a video has no captions   ──►    /root/caddy/static/hermit-stats
   analysis → site/data/*.json   (rsync)                 (no container, no app process)
 ```
 
-All the work happens at home; the server only serves files. YouTube also bot-checks datacenter IPs, so
+All the work happens at home, in LXC `hermit-stats` (CT 112, 192.168.1.227, user `hermit`, repo
+`~/hermit-stats`); its database is the only live copy. The server only serves files. YouTube also bot-checks datacenter IPs, so
 fetching from the server wouldn't work anyway.
 
 - `hermits.toml` — the roster (channel, short name, aliases incl. caption mishearings, exclusions like
@@ -66,9 +67,12 @@ deploy/install-timer.sh
 ```
 
 Installs a systemd user timer for wherever the repo is checked out, and turns on lingering so it runs
-without a login. Runs `hermit-stats update` at ~04:30; output in `logs/update.log`. Extra flags for that
-machine go in `deploy/hermit-stats.env` (not committed), e.g.
-`HERMIT_STATS_ARGS=--cookies cookies.txt --model small`.
+without a login. Runs `hermit-stats update` at ~06:30 (after the router's overnight block for unlisted
+devices ends); output in `logs/update.log`. Before each run it installs `uv.lock` and upgrades yt-dlp, since
+YouTube breaks old versions. A failed run retries every 30 min (3 times at most); a run is killed after 8 h.
+Extra flags for that machine go in `deploy/hermit-stats.env` (not committed), e.g.
+`HERMIT_STATS_ARGS=--whisper-limit 3 --cookies cookies.txt`. `--whisper-limit` keeps a run bounded on a
+CPU-only box: caption-less videos beyond the limit wait for the next night, newest first.
 
 Each run re-lists every Hermit's season playlists and also title-matches their 30 newest uploads, so an
 episode that hasn't been added to the playlist yet is still picked up. Videos that failed (premiere not

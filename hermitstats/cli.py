@@ -162,11 +162,14 @@ def cmd_sync(args) -> int:
                 db.upsert_video(conn, owner, meta)
                 if need and not db.has_transcript(conn, r["id"]):
                     result = captions
-                    if result is None and whisper is not None:
+                    budget_left = args.whisper_limit is None or whispered < args.whisper_limit
+                    if result is None and whisper is not None and budget_left:
                         progress.update(task, description=f"[yellow]whisper[/] {(r['title'] or r['id'])[:42]}")
                         result = whisper.transcribe(r["id"], args.lang, False, _cookies(args))
                         whispered += 1
-                    if result is None:
+                    if result is None and not budget_left:
+                        progress.console.print(f"[dim]whisper limit reached, next run:[/] {meta['title']}")
+                    elif result is None:
                         progress.console.print(f"[yellow]no transcript:[/] {meta['title']}")
                     else:
                         db.save_transcript(conn, r["id"], *result)
@@ -312,6 +315,8 @@ def main(argv=None) -> int:
         s.add_argument("--lang", default="en")
         s.add_argument("--whisper", choices=("fallback", "always", "never"), default="fallback",
                        help="local Whisper: only when a video has no captions (default), always, or never")
+        s.add_argument("--whisper-limit", type=int, metavar="N",
+                       help="Whisper at most N videos this run (newest first); the rest wait for the next run")
         s.add_argument("--model", default="large-v3-turbo", help="faster-whisper model")
         s.add_argument("--device", default="auto", help="whisper device: auto, cuda, cpu")
         s.add_argument("--cache", type=Path, default=Path("cache"), help="audio download dir for Whisper")

@@ -2,14 +2,24 @@
 Description=Hermit Stats: transcribe new Hermitcraft episodes, rebuild the stats site, push it to Luma001
 After=network-online.target
 Wants=network-online.target
+# A failed run (network down, push refused) retries every 30 min, at most 3 times a day.
+StartLimitIntervalSec=1d
+StartLimitBurst=4
 
 # A template: deploy/install-timer.sh fills in @REPO@ and @UV@ for this machine.
 [Service]
 Type=oneshot
 WorkingDirectory=@REPO@
-# Extra flags for this machine, e.g. HERMIT_STATS_ARGS=--cookies cookies.txt --model small
+# Extra flags for this machine, e.g. HERMIT_STATS_ARGS=--cookies cookies.txt --whisper-limit 3
 EnvironmentFile=-@REPO@/deploy/hermit-stats.env
-ExecStart=@UV@ run hermit-stats update $HERMIT_STATS_ARGS
 Environment=PATH=@UVDIR@:/usr/local/bin:/usr/bin:/bin
+# Install what uv.lock says, then take the newest yt-dlp: YouTube breaks old versions every few weeks.
+ExecStartPre=@UV@ sync --frozen --quiet
+ExecStartPre=-@UV@ pip install --quiet --upgrade yt-dlp[default]
+ExecStart=@UV@ run --no-sync hermit-stats update $HERMIT_STATS_ARGS
+TimeoutStartSec=8h
+Restart=on-failure
+RestartSec=30min
+Nice=10
 StandardOutput=append:@REPO@/logs/update.log
 StandardError=append:@REPO@/logs/update.log

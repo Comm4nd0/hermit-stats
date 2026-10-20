@@ -2,7 +2,8 @@
 Description=Nightly Hermit Stats update
 
 [Timer]
-OnCalendar=*-*-* 04:30:00
+# After 06:00: the home router blocks unlisted devices from the internet overnight.
+OnCalendar=*-*-* 06:30:00
 Persistent=true
 RandomizedDelaySec=900
 
