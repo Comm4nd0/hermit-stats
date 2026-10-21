@@ -139,6 +139,8 @@ def cmd_sync(args) -> int:
            WHERE (v.upload_date >= ? AND v.details_at < ?) OR ? = 1""",
         (recent, stale_before, 1 if args.refresh_all else 0)).fetchall()
     refresh = [r for r in refresh if r["id"] not in {t["id"] for t in todo}]
+    if args.whisper_limit == 0:     # a captions-only run: don't ask YouTube again about videos known to need Whisper
+        todo = [r for r in todo if r["error"] != "whisper-wait"]
     # Untranscribed first; imported videos that only lack likes / release time come after.
     todo.sort(key=lambda r: db.has_transcript(conn, r["id"]))
     if args.limit:
