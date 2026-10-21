@@ -49,6 +49,11 @@ button, select, input { font: inherit; color: inherit; }
   max-width: 1440px; margin: 0 auto; padding: 24px 24px 8px;
 }
 .top h1 { margin: 0; font-size: 26px; letter-spacing: -0.01em; }
+.top .banner { display: block; width: min(100%, 560px); height: auto; border-radius: 10px; margin-bottom: 10px; }
+.top .tag {
+  font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;
+  border: 1px solid var(--ring); border-radius: 999px; padding: 2px 8px; margin-left: 6px;
+}
 .top p { margin: 2px 0 0; }
 .ghost {
   background: none; border: 1px solid var(--ring); border-radius: 8px; padding: 6px 10px; cursor: pointer; white-space: nowrap;
