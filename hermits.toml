@@ -255,7 +255,7 @@ members = ["BdoubleO100", "BigB", "Etho", "GeminiTay", "GoodTimesWithScar", "Gri
 [[collection]]
 name = "Real Life"
 series = "Life Series"
-playlist = '(?<!in\s)\breal\s*life\b'
+playlist = '^\W*real\s*life\W*$'   # only a playlist named just that: "Real Life Videos..." is vlogs
 video_title = '(?<!in\s)\breal\s*life\b'
 skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut'
 starts = "2024-03-28"

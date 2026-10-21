@@ -141,8 +141,13 @@ def cmd_sync(args) -> int:
     refresh = [r for r in refresh if r["id"] not in {t["id"] for t in todo}]
     if args.whisper_limit == 0:     # a captions-only run: don't ask YouTube again about videos known to need Whisper
         todo = [r for r in todo if r["error"] != "whisper-wait"]
-    # Untranscribed first; imported videos that only lack likes / release time come after.
-    todo.sort(key=lambda r: db.has_transcript(conn, r["id"]))
+    # Untranscribed first; imported videos that only lack likes / release time come after. Then season by
+    # season in hermits.toml order, so a long backfill finishes (and can publish) whole seasons one at a time.
+    rank = {c.name: i for i, c in enumerate(cfg.collections)}
+    season = {}
+    for vid, coll in conn.execute("SELECT video_id, collection FROM collection_videos"):
+        season[vid] = min(season.get(vid, len(rank)), rank.get(coll, len(rank)))
+    todo.sort(key=lambda r: (db.has_transcript(conn, r["id"]), season.get(r["id"], len(rank))))
     if args.limit:
         todo = todo[:args.limit]
     work = [(r, True) for r in todo] + [(r, False) for r in refresh]
@@ -263,6 +268,12 @@ def cmd_import(args) -> int:
 
 def cmd_build(args) -> int:
     cfg = _cfg(args)
+    if args.season:
+        unknown = set(args.season) - {c.name for c in cfg.collections}
+        if unknown:
+            console.print(f"[red]No such season: {', '.join(sorted(unknown))}[/]")
+            return 1
+        cfg.collections = [c for c in cfg.collections if c.name in args.season]
     conn = db.connect(args.db)
     t = time.time()
     r = builder.build(conn, cfg, args.out, log=console.print)
@@ -363,6 +374,8 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_import)
 
     s = sub.add_parser("build", help="analyse everything and write the static site")
+    s.add_argument("--season", action="append", metavar="NAME",
+                   help="only this season (repeatable), e.g. to publish seasons as a backfill finishes them")
     s.set_defaults(fn=cmd_build)
 
     s = sub.add_parser("serve", help="preview the built site locally")

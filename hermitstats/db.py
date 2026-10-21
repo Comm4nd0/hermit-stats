@@ -152,6 +152,14 @@ def pending(conn, collection: str | None = None) -> list[sqlite3.Row]:
     return conn.execute(sql + " ORDER BY v.upload_date DESC", args).fetchall()
 
 
+def untried(conn, collection: str) -> int:
+    """Collection videos never fetched yet: no transcript and no error from an attempt."""
+    return conn.execute(
+        """SELECT COUNT(*) FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
+           LEFT JOIN transcripts t ON t.video_id = v.id
+           WHERE cv.collection = ? AND t.video_id IS NULL AND v.error IS NULL""", (collection,)).fetchone()[0]
+
+
 def analysable(conn, collection: str):
     """The collection's transcribed videos with their hermit slug and every collection they're in, one hermit
     after another. A generator: a season's transcripts are never all in memory at once."""
