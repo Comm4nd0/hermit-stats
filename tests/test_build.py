@@ -272,3 +272,39 @@ def test_each_season_gets_its_own_folder_and_empty_ones_are_left_out(tmp_path):
     assert meta["collections"] == ["Season 11", "Nice Life"]
     assert [v["id"] for v in json.loads((out / "data" / "nice-life" / "videos.json").read_text())] == ["nl"]
     assert not (out / "data" / "words").exists()
+
+
+def test_life_series_players_are_hermits_or_friends_of_the_hermits(tmp_path):
+    from hermitstats import config
+    (tmp_path / "h.toml").write_text('''
+[[collection]]
+name = "Season 11"
+playlist = "x"
+[[collection]]
+name = "Wild Life"
+series = "Life Series"
+playlist = "x"
+members = ["Grian", "InTheLittleWood"]
+[[hermit]]
+name = "Grian"
+channel = "@Grian"
+[[hermit]]
+name = "InTheLittleWood"
+short = "Martyn"
+channel = "@martyn"
+only_listed = true
+''')
+    cfg = config.load(tmp_path / "h.toml")
+    assert [(h.short, h.hermit) for h in cfg.hermits] == [("Grian", True), ("Martyn", False)]
+    conn = db.connect(tmp_path / "t.db")
+    for h, ch in zip(cfg.hermits, ("UCg", "UCm")):
+        db.upsert_channel(conn, ch, h.slug, h.name, h.url, None)
+        _video(conn, f"{ch}1", ch, "Wild Life Ep 1", "20241101", ["hello everyone"] * 5)
+        db.add_to_collection(conn, "Wild Life", f"{ch}1", "title")
+    conn.commit()
+    out = tmp_path / "site"
+    build.build(conn, cfg, out, log=lambda *a: None)
+    meta = json.loads((out / "data" / "meta.json").read_text())
+    assert meta["teams"]["Wild Life"] == {"Hermits": ["grian"], "Friends of the Hermits": ["inthelittlewood"]}
+    assert "Season 11" not in meta["teams"]
+    assert {h["slug"]: h["hermit"] for h in meta["hermits"]} == {"grian": True, "inthelittlewood": False}

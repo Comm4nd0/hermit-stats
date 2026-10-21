@@ -57,6 +57,9 @@ const comparing = () => state.sel.length >= 1 && state.sel.length <= MAX_COMPARE
 const color = slug => { const i = comparing() ? state.sel.indexOf(slug) : -1; return i >= 0 ? css(`--s${i + 1}`) : css('--s1'); };
 const hermitcraft = () => season().series === 'Hermitcraft';
 const people = () => hermitcraft() ? 'Hermits' : 'players';      // the Life Series isn't only Hermits
+/** Wording for the season: outside Hermitcraft not everyone is a Hermit (the rest are friends of the Hermits). */
+const words4 = s => hermitcraft() || !s ? s : s.replace(/\bHermits\b/g, 'players').replace(/\bHermit\b/g, 'player');
+const friend = slug => !hermitcraft() && H[slug] && !H[slug].hermit;
 const seasonTeams = () => Object.entries(META.teams?.[state.coll] ?? {});
 const byHermit = list => { const m = {}; for (const v of list) (m[v.h] ??= []).push(v); return m; };
 const name = slug => H[slug]?.short ?? slug;
@@ -115,8 +118,8 @@ function card(container, spec) {
   el.className = 'card' + (spec.wide ? ' wide' : '');
   el.innerHTML = `<header><div><h3></h3><p class="sub"></p></div><div class="tools"></div></header>
     <div class="body"></div><div class="tablewrap" hidden></div>`;
-  $('h3', el).textContent = spec.title;
-  $('.sub', el).textContent = spec.sub || '';
+  $('h3', el).textContent = words4(spec.title);
+  $('.sub', el).textContent = words4(spec.sub || '');
   container.appendChild(el);
   const tools = $('.tools', el);
   for (const t of spec.tools || []) tools.appendChild(t);
@@ -171,7 +174,7 @@ function table({ cols, rows }) {
     const head = t.createTHead().insertRow();
     for (const c of cols) {
       const th = document.createElement('th');
-      th.textContent = c.label + (sortK === c.k ? (dir < 0 ? ' ↓' : ' ↑') : '');
+      th.textContent = words4(c.label) + (sortK === c.k ? (dir < 0 ? ' ↓' : ' ↑') : '');
       if (c.n) th.className = 'n';
       th.onclick = () => { dir = sortK === c.k ? -dir : (c.n ? -1 : 1); sortK = c.k; draw(); };
       head.appendChild(th);
@@ -343,7 +346,7 @@ function drawFilters() {
   for (const slug of present()) {
     const h = H[slug];
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip'; b.title = fullName(slug);
+    b.type = 'button'; b.className = 'chip'; b.title = fullName(slug) + (friend(slug) ? ' · friend of the Hermits' : '');
     b.setAttribute('aria-pressed', String(state.sel.includes(slug)));
     if (h.avatar) { const img = new Image(); img.src = h.avatar; img.alt = ''; img.loading = 'lazy'; b.appendChild(img); }
     else { const d = document.createElement('span'); d.className = 'dot'; b.appendChild(d); }
@@ -376,7 +379,8 @@ function drawFilters() {
   $('#sel-hint').textContent = !state.sel.length ? '— all of them; pick up to 3 to compare'
     : state.sel.length > MAX_COMPARE ? `— ${state.sel.length} selected, shown together` : '— click again to deselect';
   const list = collVids();
-  $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} ${people()}`;
+  $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} ${people()}` + (hermitcraft() ? '' : ` (${present().filter(s => !friend(s)).length} Hermits, ${present().filter(friend).length} friends of the Hermits)`);
+  $('#search-hint').textContent = `Counts every time a word or phrase is said in the selected ${people()}' episodes, and lists each moment with a link straight to it.`;
   $('#sel-summary').textContent = `${state.coll} · ${selectionLabel()}`;
   const panel = state.ep ? 'episode' : state.tab;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === panel));
@@ -476,7 +480,7 @@ const TABS = {
     const t = [
       ['Episodes', fmt(list.length)], ['Hours of footage', fmt(Math.round(hours(secs)))], ['Words spoken', fmt(w)],
       ['Words per minute', secs ? (w / (secs / 60)).toFixed(0) : '—'], ['Views', fmt(sum(list, v => v.v))],
-      ['Likes', fmt(sum(list, v => v.l))], ['Times another Hermit is named', fmt(mentions)],
+      ['Likes', fmt(sum(list, v => v.l))], [words4('Times another Hermit is named'), fmt(mentions)],
     ];
     const sharing = comparing() ? state.sel.filter(s => present().includes(s)) : [];
     const [docs, faces] = await Promise.all([Promise.all(sharing.map(words)), Promise.all(sharing.map(s => loadImage(H[s].avatar)))]);
@@ -873,7 +877,7 @@ const TABS = {
     const list = vids(), slugs = [...new Set(list.map(v => v.h))];
     let loaded = 0;
     const progress = () => searchBusy(loaded < slugs.length
-      ? `Loading transcripts… ${loaded} of ${slugs.length} Hermits` : `Searching ${full(list.length)} episodes…`);
+      ? `Loading transcripts… ${loaded} of ${slugs.length} ${people()}` : `Searching ${full(list.length)} episodes…`);
     progress();
     let docs;
     try {
@@ -993,14 +997,14 @@ function whatsNew() {
   const epList = eps.length ? `<ul class="news-list">${eps.slice(0, 8).map(v => `<li>${face(v.h)}<div><a href="${esc(epHref(v.id))}">${esc(v.t)}</a>
       <div class="muted small">${esc(name(v.h))} · ${esc(longDate(v.d))}</div></div></li>`).join('')}</ul>
       ${eps.length > 8 ? `<a class="small" href="${esc(hashFor({ tab: 'videos', ep: null }))}">and ${eps.length - 8} more in Videos</a>` : ''}`
-    : '<p class="muted small">No episodes from the selected Hermits in this stretch.</p>';
+    : `<p class="muted small">No episodes from the selected ${people()} in this stretch.</p>`;
   const pairList = firsts.length ? `<ul class="news-list">${firsts.map(([k, v]) => {
       const b = k.split('>')[1];
       return `<li>${face(v.h)}<div>${esc(name(v.h))} talks about ${esc(name(b))} <span class="muted">(${v.m[b]} times)</span>
         <div class="muted small"><a href="${esc(epHref(v.id))}">${esc(longDate(v.d))}</a></div></div></li>`;
     }).join('')}</ul>` : '<p class="muted small">No new pairs in this stretch.</p>';
   const ww = wk?.words?.length ? `<div class="phrases">${wk.words.map(([w, , c]) => `<a class="w" href="${esc(searchHref(w))}" title="said ${c} times that week">${esc(w)}</a>`).join('')}</div>
-      <p class="muted small">Said far more from ${esc(longDate(wk.from))} to ${esc(longDate(wk.to))} than earlier in the season, by all Hermits · click one to search it</p>`
+      <p class="muted small">Said far more from ${esc(longDate(wk.from))} to ${esc(longDate(wk.to))} than earlier in the season, by all ${people()} · click one to search it</p>`
     : '<p class="muted small">Not enough that week to say.</p>';
   return { title, sub, html: `<div class="news">
     <div><h4>Episodes</h4>${epList}</div>
@@ -1116,7 +1120,7 @@ async function episodePage(token) {
   const tiles = [
     ['Words spoken', x => x.w, fmt], ['Words per minute', x => x.wpm, n => n.toFixed(0)],
     ['Vocabulary richness', x => x.r != null ? 100 * x.r : null, n => n.toFixed(1)], ['Minutes', x => x.dur / 60, n => n.toFixed(0)],
-    ['Hermits named', named, fmt], ['Views', x => x.v, fmt], ['Likes per 1k views', likes, n => n.toFixed(1)],
+    [words4('Hermits named'), named, fmt], ['Views', x => x.v, fmt], ['Likes per 1k views', likes, n => n.toFixed(1)],
   ];
   $('#episode-tiles').innerHTML = tiles.map(([k, f, show]) => {
     const val = f(v), usual = avg(f);
@@ -1133,7 +1137,7 @@ async function episodePage(token) {
       const counts = {};
       for (const [, s] of extra.mt) if (H[s]) counts[s] = (counts[s] || 0) + 1;
       const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-      if (!cats.length) return { empty: 'No other Hermit is named in this episode.' };
+      if (!cats.length) return { empty: words4('No other Hermit is named in this episode.') };
       const pts = extra.mt.filter(([, s]) => H[s]);
       return {
         height: Math.max(160, cats.length * 30 + 60),

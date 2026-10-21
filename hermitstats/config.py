@@ -43,6 +43,7 @@ class Hermit:
     playlists: dict[str, str] = field(default_factory=dict)   # collection name -> playlist URL / id
     short: str = ""
     only_listed: bool = False          # a former Hermit or Life Series player: only in collections naming them
+    hermit: bool = True                # played a Hermitcraft season; Life Series-only players are friends of the Hermits
 
     @property
     def slug(self) -> str:
@@ -101,4 +102,6 @@ def load(path: Path) -> Config:
     for c, rc in zip(collections, raw.get("collection", [])):
         c.teams = {team: [cfg.hermit(m).slug for m in members] for team, members in rc.get("teams", {}).items()}
         c.members = [cfg.hermit(m).slug for m in rc.get("members", [])]
+    for h in hermits:
+        h.hermit = any(c.series == "Hermitcraft" and c.includes(h) for c in collections)
     return cfg

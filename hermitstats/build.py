@@ -177,6 +177,18 @@ def status(conn, cfg: Config) -> dict:
     return {"generated": int(time.time()), "sync": db.get_kv(conn, "last_sync"), "waiting": waiting}
 
 
+def teams(coll, hermits: dict, present: set) -> dict[str, list[str]]:
+    """The collection's teams; outside Hermitcraft also its Hermits and its friends of the Hermits."""
+    out = dict(coll.teams)
+    if coll.series != "Hermitcraft":
+        people = [s for s in coll.members if s in present]
+        split = {"Hermits": [s for s in people if hermits[s].hermit],
+                 "Friends of the Hermits": [s for s in people if not hermits[s].hermit]}
+        if all(split.values()):
+            out.update(split)
+    return out
+
+
 def _avatar(url: str | None, dest: Path) -> bool:
     if dest.exists():
         return True
@@ -314,7 +326,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
     roster = []
     for h in cfg.hermits:
         has_avatar = _avatar(avatars.get(h.slug), out / "avatars" / f"{h.slug}.jpg")
-        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in present,
+        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in present, "hermit": h.hermit,
                        "avatar": f"avatars/{h.slug}.jpg" if has_avatar else None})
 
     meta = {
@@ -322,7 +334,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
         "site": cfg.site_url,
         "collections": [s["name"] for s in seasons],
         "seasons": seasons,
-        "teams": {c.name: c.teams for c in cfg.collections if c.teams},
+        "teams": {c.name: teams(c, hermits, present) for c in cfg.collections if teams(c, hermits, present)},
         "hermits": roster,
         "lexicon": text.LEXICON,
         "week": week,
