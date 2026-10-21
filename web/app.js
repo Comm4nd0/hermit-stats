@@ -1578,13 +1578,11 @@ async function boot() {
   for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; state.ep = null; update(); };
   $('#search-form').onsubmit = e => { e.preventDefault(); state.search = $('#search-input').value.trim(); update(); };
   $('#theme').onclick = () => {
-    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    const t = dark ? 'light' : 'dark';
+    const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
     applyTheme(t);
     try { localStorage.setItem('theme', t); } catch { /* storage blocked */ }
     update();
   };
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => update());
   addEventListener('hashchange', async () => {     // pasted / shared links, episode links, Back
     const was = [state.ep, state.tab];
     readHash();
