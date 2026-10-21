@@ -63,8 +63,8 @@ def test_collection_filters():
     assert not c.wants("Hermitcraft #11", "20150226")
 
 
-def test_guests_only_join_collections_that_name_them():
-    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], guest=True)
+def test_only_listed_channels_only_join_collections_that_name_them():
+    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], only_listed=True)
     season = Collection("Season 11", re.compile(r"x"), None)
     life = Collection("Nice Life", re.compile(r"x"), None, members=["grian", "inthelittlewood"])
     assert season.includes(HERMITS[2]) and not season.includes(martyn)

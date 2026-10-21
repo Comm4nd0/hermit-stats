@@ -192,20 +192,23 @@ def test_build_writes_every_data_file(tmp_path):
     meta = json.loads((out / "data" / "meta.json").read_text())
     assert meta["week"]["Season 11"]["from"] == "2026-09-28" and meta["week"]["Season 11"]["to"] == "2026-10-04"
 
-    videos = {v["id"]: v for v in json.loads((out / "data" / "videos.json").read_text())}
+    assert meta["seasons"] == [{"name": "Season 11", "slug": "season-11", "series": "Hermitcraft"}]
+    season = out / "data" / "season-11"
+    videos = {v["id"]: v for v in json.loads((season / "videos.json").read_text())}
     assert videos["m0"]["ep"] == 1 and videos["m0"]["m"] == {"grian": 5} and videos["m0"]["a"] > 0
     assert videos["g0"]["m"] == {"mumbo-jumbo": 15}
 
-    eps = json.loads((out / "data" / "episodes" / "grian.json").read_text())
+    eps = json.loads((season / "episodes" / "grian.json").read_text())
     assert eps["g0"]["mt"][:3] == [[20, "mumbo-jumbo"]] * 3
 
-    words = json.loads((out / "data" / "words" / "mumbo-jumbo.json").read_text())["Season 11"]
+    words = json.loads((season / "words" / "mumbo-jumbo.json").read_text())["Season 11"]
     assert "redstone" in [w for w, *_ in words["x"]]
     assert isinstance(words["p"], list)    # too little speech here for any phrase to clear min_z
 
     status = json.loads((out / "data" / "status.json").read_text())
     assert status["sync"] == {"started": 1, "finished": 2}
     assert [(w["id"], w["why"]) for w in status["waiting"]] == [("late", "Waiting for Whisper")]
+    assert status["counts"] == {"Season 11": {"grian": {"auto-captions": 4}, "mumbo-jumbo": {"auto-captions": 4}}}
     assert (out / "index.html").exists() and (out / "app.js").exists()
 
 
@@ -240,9 +243,32 @@ def test_discovery_skips_collections_the_channel_is_not_in(tmp_path, monkeypatch
         "id": "UCm", "name": "Martyn", "avatar_url": None, "playlists": [("PL1", "Hermitcraft 11"), ("PL2", "Nice Life")]})
     monkeypatch.setattr(youtube, "list_playlist", lambda pid, *a, **k: [{"id": pid, "title": "Ep 1", "upload_date": "20251205"}])
     monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
-    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], guest=True)
+    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], only_listed=True)
     cfg = Config([Collection("Season 11", re.compile("hermitcraft"), None),
                   Collection("Nice Life", re.compile("nice life", re.I), None, members=["inthelittlewood"])],
                  [martyn], None, None)
     assert cli._discover(conn, cfg, martyn, None) == 1
     assert [r[0] for r in conn.execute("SELECT collection FROM collection_videos")] == ["Nice Life"]
+
+
+def test_each_season_gets_its_own_folder_and_empty_ones_are_left_out(tmp_path):
+    grian = HERMITS[2]
+    cfg = Config([Collection("Season 11", re.compile("x"), None, None, "20251101"),
+                  Collection("Final Life", re.compile("x"), None, series="Life Series"),
+                  Collection("Nice Life", re.compile("x"), None, None, "20251115", "20260131", "Life Series")],
+                 [grian], None, None)
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_channel(conn, "UCg", "grian", "Grian", grian.url, None)
+    _video(conn, "hc", "UCg", "Hermitcraft 11 Ep 1", "20251201", ["hello hermits"] * 5)
+    _video(conn, "nl", "UCg", "Nice Life: Episode 1", "20251205", ["hello players"] * 5)
+    db.add_to_collection(conn, "Nice Life", "nl", "title")
+    _video(conn, "late", "UCg", "Nice Life reupload", "20260601", ["hello again"] * 5)
+    db.add_to_collection(conn, "Nice Life", "late", "title")
+    conn.commit()
+    out = tmp_path / "site"
+    (out / "data" / "words").mkdir(parents=True)        # an old flat layout is cleared away
+    build.build(conn, cfg, out, log=lambda *a: None)
+    meta = json.loads((out / "data" / "meta.json").read_text())
+    assert meta["collections"] == ["Season 11", "Nice Life"]
+    assert [v["id"] for v in json.loads((out / "data" / "nice-life" / "videos.json").read_text())] == ["nl"]
+    assert not (out / "data" / "words").exists()

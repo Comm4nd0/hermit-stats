@@ -152,23 +152,28 @@ def pending(conn, collection: str | None = None) -> list[sqlite3.Row]:
     return conn.execute(sql + " ORDER BY v.upload_date DESC", args).fetchall()
 
 
-def analysable(conn) -> list[dict]:
-    """Every transcribed collection video, with its hermit slug and collection list."""
-    rows = conn.execute(
-        """SELECT v.*, c.hermit, t.source, t.text, t.segments, t.added_at, GROUP_CONCAT(cv.collection, '|') AS collections
+def analysable(conn, collection: str):
+    """The collection's transcribed videos with their hermit slug and every collection they're in, one hermit
+    after another. A generator: a season's transcripts are never all in memory at once."""
+    for r in conn.execute(
+        """SELECT v.*, c.hermit, t.source, t.text, t.segments, t.added_at,
+                  (SELECT GROUP_CONCAT(collection, '|') FROM collection_videos WHERE video_id = v.id) AS collections
            FROM videos v
            JOIN channels c ON c.id = v.channel
            JOIN transcripts t ON t.video_id = v.id
-           JOIN collection_videos cv ON cv.video_id = v.id
-           WHERE c.hermit IS NOT NULL
-           GROUP BY v.id ORDER BY v.upload_date, v.timestamp"""
-    ).fetchall()
-    out = []
-    for r in rows:
+           WHERE c.hermit IS NOT NULL AND v.id IN (SELECT video_id FROM collection_videos WHERE collection = ?)
+           ORDER BY c.hermit, v.upload_date, v.timestamp""", (collection,)):
         d = dict(r)
         d["collections"] = sorted(set(d["collections"].split("|")))
-        out.append(d)
-    return out
+        yield d
+
+
+def upload_dates(conn, collection: str) -> list[str]:
+    """Upload dates of the collection's transcribed videos (cheap: no transcript text)."""
+    return [r[0] for r in conn.execute(
+        """SELECT v.upload_date FROM videos v JOIN transcripts t ON t.video_id = v.id
+           WHERE v.upload_date IS NOT NULL AND v.id IN (SELECT video_id FROM collection_videos WHERE collection = ?)""",
+        (collection,))]
 
 
 def status(conn) -> list[sqlite3.Row]:

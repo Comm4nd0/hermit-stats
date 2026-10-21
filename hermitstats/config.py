@@ -13,17 +13,25 @@ class Collection:
     video_title: re.Pattern | None
     skip: re.Pattern | None = None
     starts: str | None = None          # YYYYMMDD; earlier uploads are never in the collection
+    ends: str | None = None            # YYYYMMDD; nor are later ones
+    series: str = "Hermitcraft"
     teams: dict[str, list[str]] = field(default_factory=dict)   # team name -> member slugs
-    members: list[str] = field(default_factory=list)            # slugs; empty = every Hermit who isn't a guest
+    members: list[str] = field(default_factory=list)            # slugs; empty = every Hermit not `only_listed`
+
+    @property
+    def slug(self) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", self.name.lower()).strip("-")
 
     def wants(self, title: str, upload_date: str | None = None) -> bool:
         if self.skip and self.skip.search(title or ""):
             return False
-        return not (self.starts and upload_date and upload_date < self.starts)
+        if not upload_date:
+            return True
+        return not (self.starts and upload_date < self.starts) and not (self.ends and upload_date > self.ends)
 
     def includes(self, hermit: "Hermit") -> bool:
         """Whether the hermit's channel is searched for this collection's videos."""
-        return hermit.slug in self.members if self.members else not hermit.guest
+        return hermit.slug in self.members if self.members else not hermit.only_listed
 
 
 @dataclass
@@ -34,7 +42,7 @@ class Hermit:
     exclude: list[str] = field(default_factory=list)
     playlists: dict[str, str] = field(default_factory=dict)   # collection name -> playlist URL / id
     short: str = ""
-    guest: bool = False                # not a Hermit: only in collections whose `members` name them
+    only_listed: bool = False          # a former Hermit or Life Series player: only in collections naming them
 
     @property
     def slug(self) -> str:
@@ -77,12 +85,14 @@ def load(path: Path) -> Config:
         Collection(c["name"], re.compile(c["playlist"], re.I),
                    re.compile(c["video_title"], re.I) if c.get("video_title") else None,
                    re.compile(c["skip"], re.I) if c.get("skip") else None,
-                   c["starts"].replace("-", "") if c.get("starts") else None)
+                   c["starts"].replace("-", "") if c.get("starts") else None,
+                   c["ends"].replace("-", "") if c.get("ends") else None,
+                   c.get("series", "Hermitcraft"))
         for c in raw.get("collection", [])
     ]
     hermits = [Hermit(h["name"], h["channel"], [a.lower() for a in h.get("aliases", [])],
                       [e.lower() for e in h.get("exclude", [])], h.get("playlists", {}), h.get("short") or h["name"],
-                      h.get("guest", False))
+                      h.get("only_listed", False))
                for h in raw.get("hermit", [])]
     deploy = raw.get("deploy", {})
     cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"))

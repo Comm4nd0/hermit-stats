@@ -17,7 +17,7 @@ const MAX_COMPARE = 3;
 const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', ep: null };
 let META, VIDEOS, H = {};
 let VISIT = { prev: null };       // when this browser last looked (unix seconds), for "new since your last visit"
-const cache = { words: {}, trans: {}, eps: {} };
+const cache = { words: {}, trans: {}, eps: {}, vids: {} };
 const charts = [];
 
 /* ---------------------------------------------------------------- data access */
@@ -27,9 +27,17 @@ async function json(path) {
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 }
-const words = slug => cache.words[slug] ??= json(`data/words/${slug}.json`);
-const transcripts = slug => cache.trans[slug] ??= json(`data/transcripts/${slug}.json`);
-const episodes = slug => cache.eps[slug] ??= json(`data/episodes/${slug}.json`);
+// Each season has its own folder: data/<season>/{videos.json, words/, transcripts/, episodes/}.
+const season = (c = state.coll) => META.seasons.find(s => s.name === c);
+const seasonFile = (kind, slug) => `data/${season().slug}/${kind}/${slug}.json`;
+const words = slug => cache.words[`${state.coll}/${slug}`] ??= json(seasonFile('words', slug));
+const transcripts = slug => cache.trans[`${state.coll}/${slug}`] ??= json(seasonFile('transcripts', slug));
+const episodes = slug => cache.eps[`${state.coll}/${slug}`] ??= json(seasonFile('episodes', slug));
+/** Make VIDEOS the current season's episodes, and drop an episode link that isn't in it. */
+async function loadSeason() {
+  VIDEOS = await (cache.vids[state.coll] ??= json(`data/${season().slug}/videos.json`));
+  if (state.ep && !VIDEOS.some(v => v.id === state.ep)) state.ep = null;
+}
 const statusData = () => cache.status ??= json('data/status.json');
 const ytUrl = (id, t) => `https://www.youtube.com/watch?v=${id}` + (t != null ? `&t=${Math.max(0, t - 2)}s` : '');
 const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -47,8 +55,8 @@ const scope = () => state.sel.length ? state.sel : present();           // hermi
 const vids = () => { const s = new Set(scope()); return collVids().filter(v => s.has(v.h)); };
 const comparing = () => state.sel.length >= 1 && state.sel.length <= MAX_COMPARE;
 const color = slug => { const i = comparing() ? state.sel.indexOf(slug) : -1; return i >= 0 ? css(`--s${i + 1}`) : css('--s1'); };
-// A season with non-Hermits in it (a Life series) calls everyone players.
-const people = () => present().some(s => H[s].guest) ? 'players' : 'Hermits';
+const hermitcraft = () => season().series === 'Hermitcraft';
+const people = () => hermitcraft() ? 'Hermits' : 'players';      // the Life Series isn't only Hermits
 const seasonTeams = () => Object.entries(META.teams?.[state.coll] ?? {});
 const byHermit = list => { const m = {}; for (const v of list) (m[v.h] ??= []).push(v); return m; };
 const name = slug => H[slug]?.short ?? slug;
@@ -301,7 +309,7 @@ function readHash() {
   if (q.get('season') && META.collections.includes(q.get('season'))) state.coll = q.get('season');
   state.sel = (q.get('h') || '').split(',').filter(s => H[s]);
   state.search = q.get('q') || '';
-  state.ep = VIDEOS.some(v => v.id === q.get('ep')) ? q.get('ep') : null;
+  state.ep = q.get('ep') || null;          // checked against the season once it's loaded
 }
 /** The URL hash for a state (the current one, or one with some fields changed). */
 function hashFor(changes = {}) {
@@ -321,7 +329,9 @@ function openEpisode(id) { location.hash = epHref(id); }
 
 function drawFilters() {
   const sel = $('#collection');
-  sel.innerHTML = META.collections.map(c => `<option${c === state.coll ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const series = [...new Set(META.seasons.map(s => s.series))];
+  sel.innerHTML = series.map(name => `<optgroup label="${esc(name)}">` + META.seasons.filter(s => s.series === name)
+    .map(s => `<option${s.name === state.coll ? ' selected' : ''}>${esc(s.name)}</option>`).join('') + '</optgroup>').join('');
   const box = $('#hermits');
   box.innerHTML = '';
   const all = document.createElement('button');
@@ -1036,7 +1046,7 @@ function shareCard(slug, doc, img) {
   const text = (s, px, weight, ink, tx, ty, maxW) => { x.font = `${weight} ${px}px ${F}`; x.fillStyle = css(ink); x.fillText(maxW ? fitText(x, s, maxW) : s, tx, ty); };
   const left = img ? 232 : 64;
   text(fullName(slug), 64, 700, '--ink', left, 132, W - left - 64);
-  text(people() === 'Hermits' ? `Hermitcraft ${state.coll}` : state.coll, 30, 400, '--ink-2', left, 180);
+  text(hermitcraft() ? `Hermitcraft ${state.coll}` : `${season().series}: ${state.coll}`, 30, 400, '--ink-2', left, 180);
   stats.forEach(([v, k], i) => { text(v, 56, 650, '--ink', 64 + i * 272, 306); text(k, 24, 400, '--ink-2', 64 + i * 272, 342, 250); });
   x.fillStyle = css('--grid'); x.fillRect(64, 378, W - 128, 2);
   facts.forEach(([k, v], i) => {
@@ -1213,7 +1223,7 @@ TABS.status = async function (token) {
     ['Last sync took', run ? `${Math.max(1, Math.round((run.finished - run.started) / 60))} min` : '—'],
     ['Transcribed last sync', run?.transcribed != null ? `${full(run.transcribed)} of ${full(run.todo)}` : '—'],
     ['Via Whisper last sync', run ? full(run.whispered) : '—'], ['Waiting for a transcript', full(st.waiting.length)],
-    ['Waiting for Whisper', full(why['Waiting for Whisper'] || 0)], ['Episodes in the stats', full(VIDEOS.length)],
+    ['Waiting for Whisper', full(why['Waiting for Whisper'] || 0)], ['Episodes in the stats', full(sum(Object.values(st.counts).flatMap(Object.values), c => sum(Object.values(c), n => n)))],
   ];
   $('#status-tiles').innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
 
@@ -1224,8 +1234,8 @@ TABS.status = async function (token) {
     build: () => {
       const label = { 'auto-captions': 'YouTube auto-captions', 'manual-captions': 'Creator’s captions', whisper: 'Whisper (no captions)' };
       const rows = META.collections.map(c => {
-        const l = VIDEOS.filter(v => v.c.includes(c)), r = { name: c };
-        for (const k of Object.keys(label)) r[k] = l.filter(v => v.src === k).length;
+        const r = { name: c };
+        for (const k of Object.keys(label)) r[k] = sum(Object.values(st.counts[c] || {}), n => n[k] || 0);
         return r;
       }).filter(r => Object.keys(label).some(k => r[k]));
       return { tableOnly: true, table: { cols: [{ k: 'name', label: 'Season' }, ...Object.entries(label).map(([k, l]) => ({ k, label: l, n: true }))], rows } };
@@ -1239,8 +1249,8 @@ TABS.status = async function (token) {
     build: () => {
       const rows = [];
       for (const c of META.collections) for (const h of META.hermits) {
-        const have = VIDEOS.filter(v => v.h === h.slug && v.c.includes(c)).length, wait = st.waiting.filter(w => w.h === h.slug && w.c.includes(c)).length;
-        if (have || wait) rows.push({ season: c, hermit: h.short, have, wait, whisper: VIDEOS.filter(v => v.h === h.slug && v.c.includes(c) && v.src === 'whisper').length });
+        const n = st.counts[c]?.[h.slug] || {}, have = sum(Object.values(n), x => x), wait = st.waiting.filter(w => w.h === h.slug && w.c.includes(c)).length;
+        if (have || wait) rows.push({ season: c, hermit: h.short, have, wait, whisper: n.whisper || 0 });
       }
       return { tableOnly: true, table: { cols: [{ k: 'season', label: 'Season' }, { k: 'hermit', label: 'Hermit' }, { k: 'have', label: 'In the stats', n: true },
         { k: 'wait', label: 'Waiting', n: true }, { k: 'whisper', label: 'Via Whisper', n: true }], rows } };
@@ -1354,13 +1364,19 @@ function readVisit() {
 async function boot() {
   try { applyTheme(localStorage.getItem('theme')); } catch { /* storage blocked */ }
   readVisit();
-  [META, VIDEOS] = await Promise.all([json('data/meta.json'), json('data/videos.json')]);
+  META = await json('data/meta.json');
   for (const h of META.hermits) H[h.slug] = h;
-  state.coll = META.collections.find(c => VIDEOS.some(v => v.c.includes(c))) || META.collections[0];
+  state.coll = META.collections[0];
   readHash();
+  await loadSeason();
   $('#updated').textContent = `Updated ${new Date(META.generated * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 
-  $('#collection').onchange = e => { state.coll = e.target.value; state.sel = state.sel.filter(s => present().includes(s)); state.ep = null; update(); };
+  $('#collection').onchange = async e => {
+    state.coll = e.target.value; state.ep = null;
+    await loadSeason();
+    state.sel = state.sel.filter(s => present().includes(s));
+    update();
+  };
   for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; state.ep = null; if (scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 }); update(); };
   $('#search-form').onsubmit = e => { e.preventDefault(); state.search = $('#search-input').value.trim(); update(); };
   $('#theme').onclick = () => {
@@ -1371,9 +1387,10 @@ async function boot() {
     update();
   };
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => update());
-  addEventListener('hashchange', () => {     // pasted / shared links, episode links, Back
+  addEventListener('hashchange', async () => {     // pasted / shared links, episode links, Back
     const was = [state.ep, state.tab];
     readHash();
+    await loadSeason();
     if (state.ep !== was[0] || state.tab !== was[1]) scrollTo({ top: 0 });
     update();
   });

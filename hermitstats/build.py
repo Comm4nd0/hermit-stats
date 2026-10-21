@@ -17,7 +17,6 @@ from .config import Config
 from .mentions import MentionFinder
 
 WEB = Path(__file__).resolve().parent.parent / "web"
-ALL = "*"           # words-file key for "every collection"
 TOP_WORDS, TOP_BIGRAMS, TOP_TRIGRAMS = 1500, 600, 400
 CHUNK_SECONDS = 20  # transcript search granularity
 WEEK_DAYS = 7       # "words of the week": the last 7 days of uploads in a collection
@@ -194,141 +193,147 @@ def _avatar(url: str | None, dest: Path) -> bool:
 
 
 def build(conn, cfg: Config, out: Path, log=print) -> dict:
+    """Write the site. One collection at a time, and within it one hermit at a time, so memory stays bounded
+    however many seasons there are: each collection gets its own folder under data/."""
     finder = MentionFinder(cfg.hermits)
     hermits = {h.slug: h for h in cfg.hermits}
     colls = {c.name: c for c in cfg.collections}
-    videos = []
-    for v in db.analysable(conn):      # dates are only known once details are fetched; filter here too
-        v["collections"] = [c for c in v["collections"] if c in colls and colls[c].wants("", v["upload_date"])]
-        if v["collections"]:
-            videos.append(v)
-    log(f"Analysing {len(videos)} transcribed videos")
-
-    (out / "data" / "words").mkdir(parents=True, exist_ok=True)
-    (out / "data" / "transcripts").mkdir(parents=True, exist_ok=True)
-    (out / "data" / "episodes").mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(out / "data", ignore_errors=True)     # a renamed hermit or season leaves no stale files
     (out / "avatars").mkdir(parents=True, exist_ok=True)
-
     lexicon = {g: [text.phrase_tokens(t) for t in terms] for g, terms in text.LEXICON.items()}
-    words = defaultdict(lambda: defaultdict(Counter))      # slug -> collection -> word counts
-    bigrams = defaultdict(lambda: defaultdict(Counter))
-    trigrams = defaultdict(lambda: defaultdict(Counter))
-    totals = defaultdict(Counter)                          # slug -> collection -> tokens
-    spread = defaultdict(lambda: defaultdict(Counter))     # slug -> collection -> episodes each phrase is in
-    n_eps = defaultdict(Counter)                           # slug -> collection -> episodes
-    transcripts = defaultdict(dict)
-    episodes = defaultdict(dict)                           # slug -> video id -> timeline, standout words
-    ep_words = {}                                          # video id -> (frequent words, word count, collection)
-    starts = {c: week_start([v["upload_date"] for v in videos if c in v["collections"] and v["upload_date"]])
-              for c in colls}
-    recent = defaultdict(Counter)                          # collection -> words in its last week
-    rows = []
+    seasons, week, counts = [], {}, defaultdict(lambda: defaultdict(Counter))   # counts: season -> slug -> source
+    present, total = set(), set()
 
-    for v in videos:
-        slug = v["hermit"]
-        raw = text.clean(v["text"])
-        toks = text.tokenize(raw)
-        grams = text.ngram_index(toks, 3)
-        lex = {}
-        for g, terms in lexicon.items():
-            counts = {" ".join(t): grams[t] for t in terms if grams[t]}
-            if counts:
-                lex[g] = counts
-        spoken = finder.count(toks, skip=slug)
-        title_mentions = sorted(set(finder.count(text.tokenize(v["title"] or ""), skip=slug)))
+    for coll in cfg.collections:
+        dates = [d for d in db.upload_dates(conn, coll.name) if coll.wants("", d)]
+        start = week_start(dates)
+        if not start:
+            continue        # no episodes yet: the season stays out of the picker
+        log(f"{coll.name}: analysing {len(dates)} transcribed videos")
+        base = out / "data" / coll.slug
+        for d in ("words", "transcripts", "episodes"):
+            (base / d).mkdir(parents=True, exist_ok=True)
+        words, bigrams, trigrams = defaultdict(Counter), defaultdict(Counter), defaultdict(Counter)   # slug -> counts
+        totals, spread, n_eps = Counter(), defaultdict(Counter), Counter()
+        recent = Counter()                                     # words in the season's last week
+        rows = []
 
-        uni = Counter(w for w in toks if text.interesting(w))
-        bi = Counter({" ".join(g): c for g, c in grams.items()
-                      if len(g) == 2 and text.interesting(g[0]) and text.interesting(g[1])})
-        tri = Counter({" ".join(g): c for g, c in grams.items()
-                       if len(g) == 3 and text.interesting(g[0]) and text.interesting(g[2])})
-        for key in (*v["collections"], ALL):
-            words[slug][key].update(uni)
-            bigrams[slug][key].update(bi)
-            trigrams[slug][key].update(tri)
-            totals[slug][key] += len(toks)
-            spread[slug][key].update(bi.keys())
-            spread[slug][key].update(tri.keys())
-            n_eps[slug][key] += 1
-        for c in v["collections"]:
-            if starts[c] and (v["upload_date"] or "") >= starts[c]:
-                recent[c].update(uni)
-        ep_words[v["id"]] = (Counter({w: c for w, c in uni.items() if c >= 4}), sum(uni.values()), v["collections"][0])
+        def finish(slug, transcripts, episodes, ep_words):
+            """A hermit's videos are done: their standout words per episode, then their files."""
+            season = words[slug]
+            for vid, ep in episodes.items():
+                freq, n = ep_words[vid]
+                ep["x"] = _distinctive(freq, season, top=15, min_count=4, n_target=n) \
+                    if sum(season.values()) > n else []
+            (base / "transcripts" / f"{slug}.json").write_text(json.dumps(transcripts, separators=(",", ":")))
+            (base / "episodes" / f"{slug}.json").write_text(json.dumps(episodes, separators=(",", ":")))
 
-        segments = json.loads(v["segments"])
-        transcripts[slug][v["id"]] = _chunks(segments)
-        episodes[slug][v["id"]] = {"mt": mention_times(finder, segments, slug)}
-        dur = v["duration"] or 0
-        rows.append({
-            "id": v["id"], "h": slug, "c": v["collections"], "t": v["title"], "d": _date(v["upload_date"]),
-            "ts": v["timestamp"], "dur": round(dur), "v": v["view_count"], "l": v["like_count"],
-            "cm": v["comment_count"], "ep": episode_number(v["title"]), "src": v["source"], "a": v["added_at"],
-            "w": len(toks), "u": len(set(toks)), "r": text.mattr(toks),
-            "wpm": round(len(toks) / (dur / 60), 1) if dur else None,
-            "laugh": text.laughs(raw), "music": text.music_cues(raw),
-            "m": dict(spoken), "tm": title_mentions, "lex": lex,
-            "open": " ".join(toks[:14]), "close": " ".join(toks[-14:]),
-        })
+        slug = None
+        transcripts, episodes, ep_words = {}, {}, {}
+        for v in db.analysable(conn, coll.name):
+            if not coll.wants("", v["upload_date"]):     # dates are only known once details are fetched
+                continue
+            if v["hermit"] != slug:
+                if slug:
+                    finish(slug, transcripts, episodes, ep_words)
+                slug, transcripts, episodes, ep_words = v["hermit"], {}, {}, {}
+            v["collections"] = [c for c in v["collections"] if c in colls and colls[c].wants("", v["upload_date"])]
+            raw = text.clean(v["text"])
+            toks = text.tokenize(raw)
+            grams = text.ngram_index(toks, 3)
+            lex = {}
+            for g, terms in lexicon.items():
+                found = {" ".join(t): grams[t] for t in terms if grams[t]}
+                if found:
+                    lex[g] = found
+            spoken = finder.count(toks, skip=slug)
+            title_mentions = sorted(set(finder.count(text.tokenize(v["title"] or ""), skip=slug)))
 
-    present = sorted(words, key=lambda s: hermits[s].name.lower())
-    everyone = defaultdict(Counter)                        # collection -> everyone's word / phrase counts
-    everyone_b, everyone_t = defaultdict(Counter), defaultdict(Counter)
-    for slug in present:
-        for key in words[slug]:
-            everyone[key].update(words[slug][key])
-            everyone_b[key].update(bigrams[slug][key])
-            everyone_t[key].update(trigrams[slug][key])
-    for slug in present:
-        doc = {}
-        own = {t for a in hermits[slug].aliases for t in text.phrase_tokens(a)}
-        for key, counter in words[slug].items():
-            others = sum(everyone[key].values()) > sum(counter.values())
-            doc[key] = {
-                "n": totals[slug][key],
-                "w": counter.most_common(TOP_WORDS),
-                "b": bigrams[slug][key].most_common(TOP_BIGRAMS),
-                "t": trigrams[slug][key].most_common(TOP_TRIGRAMS),
-                "x": [x for x in _distinctive(counter, everyone[key], top=60) if x[0] not in own][:40] if others else [],
-                "p": catchphrases(bigrams[slug][key], trigrams[slug][key], everyone_b[key], everyone_t[key], own,
-                                  spread[slug][key], n_eps[slug][key]) if others else [],
-            }
-        # Each episode's standout words: against the Hermit's other episodes in its (first) collection.
-        for vid, ep in episodes[slug].items():
-            freq, n, coll = ep_words[vid]
-            season = words[slug][coll]
-            ep["x"] = _distinctive(freq, season, top=15, min_count=4, n_target=n) \
-                if sum(season.values()) > n else []
-        (out / "data" / "words" / f"{slug}.json").write_text(json.dumps(doc, separators=(",", ":")))
-        (out / "data" / "transcripts" / f"{slug}.json").write_text(
-            json.dumps(transcripts[slug], separators=(",", ":")))
-        (out / "data" / "episodes" / f"{slug}.json").write_text(json.dumps(episodes[slug], separators=(",", ":")))
+            uni = Counter(w for w in toks if text.interesting(w))
+            bi = Counter({" ".join(g): c for g, c in grams.items()
+                          if len(g) == 2 and text.interesting(g[0]) and text.interesting(g[1])})
+            tri = Counter({" ".join(g): c for g, c in grams.items()
+                           if len(g) == 3 and text.interesting(g[0]) and text.interesting(g[2])})
+            words[slug].update(uni)
+            bigrams[slug].update(bi)
+            trigrams[slug].update(tri)
+            totals[slug] += len(toks)
+            spread[slug].update(bi.keys())
+            spread[slug].update(tri.keys())
+            n_eps[slug] += 1
+            if (v["upload_date"] or "") >= start:
+                recent.update(uni)
+            ep_words[v["id"]] = (Counter({w: c for w, c in uni.items() if c >= 4}), sum(uni.values()))
+
+            segments = json.loads(v["segments"])
+            transcripts[v["id"]] = _chunks(segments)
+            episodes[v["id"]] = {"mt": mention_times(finder, segments, slug)}
+            counts[coll.name][slug][v["source"]] += 1
+            total.add(v["id"])
+            dur = v["duration"] or 0
+            rows.append({
+                "id": v["id"], "h": slug, "c": v["collections"], "t": v["title"], "d": _date(v["upload_date"]),
+                "ts": v["timestamp"], "dur": round(dur), "v": v["view_count"], "l": v["like_count"],
+                "cm": v["comment_count"], "ep": episode_number(v["title"]), "src": v["source"], "a": v["added_at"],
+                "w": len(toks), "u": len(set(toks)), "r": text.mattr(toks),
+                "wpm": round(len(toks) / (dur / 60), 1) if dur else None,
+                "laugh": text.laughs(raw), "music": text.music_cues(raw),
+                "m": dict(spoken), "tm": title_mentions, "lex": lex,
+                "open": " ".join(toks[:14]), "close": " ".join(toks[-14:]),
+            })
+        if slug:
+            finish(slug, transcripts, episodes, ep_words)
+        del transcripts, episodes, ep_words
+
+        everyone, everyone_b, everyone_t = Counter(), Counter(), Counter()
+        for s in words:
+            everyone.update(words[s])
+            everyone_b.update(bigrams[s])
+            everyone_t.update(trigrams[s])
+        for s in words:
+            own = {t for a in hermits[s].aliases for t in text.phrase_tokens(a)}
+            others = sum(everyone.values()) > sum(words[s].values())
+            doc = {coll.name: {
+                "n": totals[s],
+                "w": words[s].most_common(TOP_WORDS),
+                "b": bigrams[s].most_common(TOP_BIGRAMS),
+                "t": trigrams[s].most_common(TOP_TRIGRAMS),
+                "x": [x for x in _distinctive(words[s], everyone, top=60) if x[0] not in own][:40] if others else [],
+                "p": catchphrases(bigrams[s], trigrams[s], everyone_b, everyone_t, own, spread[s], n_eps[s])
+                if others else [],
+            }}
+            (base / "words" / f"{s}.json").write_text(json.dumps(doc, separators=(",", ":")))
+        present.update(words)
+        (base / "videos.json").write_text(json.dumps(rows, separators=(",", ":")))
+        seasons.append({"name": coll.name, "slug": coll.slug, "series": coll.series})
+        week[coll.name] = {"from": _date(start), "to": _date(max(dates)),
+                           "words": [x for x in _distinctive(recent, everyone, top=15, min_count=10) if x[1] > 0]
+                           if sum(everyone.values()) > sum(recent.values()) else []}
 
     avatars = {r["hermit"]: r["avatar_url"] for r in conn.execute("SELECT hermit, avatar_url FROM channels")}
     roster = []
     for h in cfg.hermits:
         has_avatar = _avatar(avatars.get(h.slug), out / "avatars" / f"{h.slug}.jpg")
-        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in words, "guest": h.guest,
+        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in present,
                        "avatar": f"avatars/{h.slug}.jpg" if has_avatar else None})
 
     meta = {
         "generated": int(time.time()),
         "site": cfg.site_url,
-        "collections": [c.name for c in cfg.collections if starts[c.name]],    # one with no episodes yet stays hidden
+        "collections": [s["name"] for s in seasons],
+        "seasons": seasons,
         "teams": {c.name: c.teams for c in cfg.collections if c.teams},
         "hermits": roster,
         "lexicon": text.LEXICON,
-        "week": {c: {"from": _date(starts[c]), "to": _date(max(v["upload_date"] for v in videos
-                                                              if c in v["collections"] and v["upload_date"])),
-                     "words": [x for x in _distinctive(recent[c], everyone[c], top=15, min_count=10) if x[1] > 0]
-                     if sum(everyone[c].values()) > sum(recent[c].values()) else []}
-                 for c in colls if starts[c]},
+        "week": week,
     }
     (out / "data" / "meta.json").write_text(json.dumps(meta, separators=(",", ":")))
-    (out / "data" / "videos.json").write_text(json.dumps(rows, separators=(",", ":")))
-    (out / "data" / "status.json").write_text(json.dumps(status(conn, cfg), separators=(",", ":")))
+    st = status(conn, cfg)
+    st["counts"] = counts          # season -> hermit -> transcript source -> episodes in the stats
+    (out / "data" / "status.json").write_text(json.dumps(st, separators=(",", ":")))
 
     for f in WEB.iterdir():
         if f.is_file():
             shutil.copy2(f, out / f.name)
     size = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
-    return {"videos": len(rows), "hermits": len(present), "bytes": size}
+    return {"videos": len(total), "hermits": len(present), "bytes": size}
