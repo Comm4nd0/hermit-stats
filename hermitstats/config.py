@@ -64,6 +64,7 @@ class Config:
     hermits: list[Hermit]
     deploy_target: str | None
     site_url: str | None
+    archive_channels: list[str] = field(default_factory=list)   # handles whose reuploads stay the hermit's
 
     def collection(self, name: str) -> Collection:
         for c in self.collections:
@@ -95,7 +96,8 @@ def load(path: Path) -> Config:
                       h.get("only_listed", False))
                for h in raw.get("hermit", [])]
     deploy = raw.get("deploy", {})
-    cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"))
+    cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"),
+                 [a.lower().lstrip("@") for a in raw.get("archive_channels", [])])
     for c, rc in zip(collections, raw.get("collection", [])):
         c.teams = {team: [cfg.hermit(m).slug for m in members] for team, members in rc.get("teams", {}).items()}
         c.members = [cfg.hermit(m).slug for m in rc.get("members", [])]

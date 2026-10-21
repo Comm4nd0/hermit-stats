@@ -166,6 +166,8 @@ def cmd_sync(args) -> int:
             try:
                 meta, info, captions = fut.result()
                 owner = info.get("channel_id") or r["channel"]
+                if (info.get("uploader_id") or "").lower().lstrip("@") in cfg.archive_channels:
+                    owner = r["channel"]    # a reupload of a hermit's episode: still theirs
                 if owner not in known:      # a collab upload from someone not in the roster
                     db.upsert_channel(conn, owner, None, info.get("channel"), info.get("channel_url"), None)
                     known[owner] = None
