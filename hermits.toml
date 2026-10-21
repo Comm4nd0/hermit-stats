@@ -116,6 +116,13 @@ starts = "2025-11-15"
 members = ["SmallishBeans", "Dangthatsalongname", "Rendog", "InTheLittleWood", "GeminiTay", "Solidarity", "BigB",
            "Grian", "ZombieCleo", "GoodTimesWithScar", "PearlescentMoon", "Skizzleman", "BdoubleO100", "impulseSV"]
 
+[collection.teams]   # factions, from the Life Series wiki
+"Christmas Cavers" = ["GeminiTay", "Grian"]
+"Jimpulse" = ["impulseSV", "Solidarity"]
+"Purple Defense Squad" = ["PearlescentMoon", "Rendog", "ZombieCleo"]
+"Red Winter Alliance" = ["GeminiTay", "Grian", "InTheLittleWood", "Rendog", "ZombieCleo"]
+"Red Village Alliance" = ["BigB", "Dangthatsalongname", "SmallishBeans", "Solidarity"]
+
 # Past Life: 2025-07-11 to 2025-08-29. Mumbo substituted for Tango (session 2) and Joel (session 4).
 [[collection]]
 name = "Past Life"
@@ -129,6 +136,13 @@ members = ["BdoubleO100", "BigB", "Etho", "GeminiTay", "GoodTimesWithScar", "Gri
            "PearlescentMoon", "Rendog", "Skizzleman", "Dangthatsalongname", "SmallishBeans", "Solidarity",
            "Tango Tek", "ZombieCleo", "impulseSV", "Mumbo Jumbo"]
 
+[collection.teams]   # factions, from the Life Series wiki
+"Cabin Core" = ["Etho", "GoodTimesWithScar", "Dangthatsalongname", "BdoubleO100"]
+"Gluten Guys" = ["impulseSV", "Tango Tek", "Rendog"]
+"Lost Generation" = ["ZombieCleo", "InTheLittleWood"]
+"Rejects" = ["SmallishBeans", "Solidarity", "Skizzleman", "BigB"]
+"The Villies" = ["Grian", "GeminiTay", "PearlescentMoon"]
+
 # Simple Life: special, 2025-04-01. Special 2. Bdubs died after 27 minutes and uploaded no video.
 [[collection]]
 name = "Simple Life"
@@ -140,6 +154,11 @@ starts = "2025-03-28"
 ends = "2025-05-13"
 members = ["BdoubleO100", "BigB", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "PearlescentMoon",
            "Rendog", "Skizzleman", "Dangthatsalongname", "SmallishBeans", "Solidarity", "Tango Tek", "ZombieCleo"]
+
+[collection.teams]   # factions, from the Life Series wiki
+"Dirt Fortress" = ["BdoubleO100", "Grian", "SmallishBeans", "Dangthatsalongname"]
+"Pondcast" = ["BigB", "GeminiTay", "PearlescentMoon", "InTheLittleWood", "Skizzleman", "Solidarity"]
+"Fishers" = ["ZombieCleo", "Tango Tek", "GoodTimesWithScar"]
 
 # Wild Life: 2024-10-19 to 2024-12-07.
 [[collection]]
@@ -154,6 +173,14 @@ members = ["BdoubleO100", "BigB", "Etho", "GeminiTay", "GoodTimesWithScar", "Gri
            "LDShadowLady", "Mumbo Jumbo", "PearlescentMoon", "Rendog", "Skizzleman", "Dangthatsalongname",
            "SmallishBeans", "Solidarity", "Tango Tek", "ZombieCleo", "impulseSV"]
 
+[collection.teams]   # factions, from the Life Series wiki
+"Bamboozlers" = ["GoodTimesWithScar", "LDShadowLady", "Solidarity"]
+"The Family" = ["GeminiTay", "SmallishBeans"]
+"The Gs" = ["impulseSV", "PearlescentMoon", "Dangthatsalongname", "ZombieCleo", "BigB", "Rendog"]
+"Renwood Mound" = ["InTheLittleWood", "Rendog"]
+"The Spanners" = ["Grian", "Mumbo Jumbo", "Skizzleman"]
+"Tuff Guys" = ["BdoubleO100", "Etho", "Tango Tek"]
+
 # Real Life: special, 2024-04-01. Special 1. The lookbehind keeps out "... in real life".
 [[collection]]
 name = "Real Life"
@@ -165,6 +192,12 @@ starts = "2024-03-28"
 ends = "2024-05-13"
 members = ["BigB", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "PearlescentMoon", "Rendog",
            "Skizzleman", "Dangthatsalongname", "SmallishBeans", "Solidarity", "ZombieCleo", "impulseSV"]
+
+[collection.teams]   # factions, from the Life Series wiki
+"The Club" = ["GoodTimesWithScar", "Grian", "impulseSV", "SmallishBeans", "Solidarity"]
+"Dogwarts 2" = ["InTheLittleWood", "Rendog", "Skizzleman"]
+"Gaslight Gatekeep Girlboss 2" = ["GeminiTay", "PearlescentMoon", "Dangthatsalongname", "ZombieCleo"]
+"Gem-BigB Alliance" = ["BigB", "GeminiTay"]
 
 # Secret Life: 2023-10-20 to 2023-12-15. Ren sat this season out but substituted for Tango in session 6.
 [[collection]]
@@ -179,6 +212,13 @@ members = ["BdoubleO100", "BigB", "Etho", "GeminiTay", "GoodTimesWithScar", "Gri
            "LDShadowLady", "Mumbo Jumbo", "PearlescentMoon", "Skizzleman", "Dangthatsalongname", "SmallishBeans",
            "Solidarity", "Tango Tek", "ZombieCleo", "impulseSV", "Rendog"]
 
+[collection.teams]   # factions, from the Life Series wiki
+"Big Dogs" = ["InTheLittleWood", "Solidarity"]
+"Gem and the Scotts" = ["GeminiTay", "impulseSV", "Dangthatsalongname"]
+"Heart Foundation" = ["BigB", "Skizzleman", "Tango Tek"]
+"Mounders" = ["BdoubleO100", "Mumbo Jumbo", "PearlescentMoon", "SmallishBeans"]
+"Roomies" = ["Etho", "ZombieCleo", "Grian"]
+
 # Limited Life: 2023-03-03 to 2023-04-21. Gem (her Life Series debut) and Lizzie substituted for Cleo and Pearl in session 6.
 [[collection]]
 name = "Limited Life"
@@ -192,6 +232,14 @@ members = ["BdoubleO100", "BigB", "Etho", "GoodTimesWithScar", "Grian", "InTheLi
            "Skizzleman", "Dangthatsalongname", "SmallishBeans", "Solidarity", "Tango Tek", "ZombieCleo",
            "impulseSV", "GeminiTay", "LDShadowLady"]
 
+[collection.teams]   # factions, from the Life Series wiki
+"Bad Boys" = ["Grian", "SmallishBeans", "Solidarity"]
+"The Clockers" = ["BdoubleO100", "GoodTimesWithScar", "ZombieCleo"]
+"Mean Gills" = ["InTheLittleWood", "Dangthatsalongname"]
+"Nosy Neighbors" = ["BigB", "PearlescentMoon", "Grian"]
+"T.I.E.S." = ["Etho", "impulseSV", "Skizzleman", "Tango Tek"]
+"T.I.E." = ["Etho", "impulseSV", "Tango Tek"]
+
 # Double Life: 2022-06-17 to 2022-07-22.
 [[collection]]
 name = "Double Life"
@@ -203,6 +251,16 @@ starts = "2022-06-13"
 ends = "2022-09-02"
 members = ["BdoubleO100", "BigB", "Etho", "GoodTimesWithScar", "Grian", "InTheLittleWood", "PearlescentMoon",
            "Rendog", "Dangthatsalongname", "SmallishBeans", "Solidarity", "Tango Tek", "ZombieCleo", "impulseSV"]
+
+[collection.teams]   # factions, from the Life Series wiki
+"Boat Boys" = ["Etho", "SmallishBeans"]
+"Box Boys" = ["BigB", "Rendog"]
+"Dessert Duo" = ["GoodTimesWithScar", "Grian"]
+"Homewreckers" = ["BdoubleO100", "impulseSV"]
+"Ranchers" = ["Solidarity", "Tango Tek"]
+"Mean Girls" = ["Dangthatsalongname", "ZombieCleo"]
+"Divorce Quartet" = ["Dangthatsalongname", "ZombieCleo", "InTheLittleWood", "PearlescentMoon"]
+"Secret Soulmates" = ["Grian", "BigB"]
 
 # Last Life: 2021-09-21 to 2021-11-16.
 [[collection]]
@@ -216,6 +274,16 @@ ends = "2021-12-28"
 members = ["BdoubleO100", "BigB", "Etho", "GoodTimesWithScar", "Grian", "InTheLittleWood", "LDShadowLady",
            "Mumbo Jumbo", "PearlescentMoon", "Rendog", "Skizzleman", "Dangthatsalongname", "SmallishBeans",
            "Solidarity", "Tango Tek", "ZombieCleo", "impulseSV"]
+
+[collection.teams]   # factions, from the Life Series wiki
+"Forest Fairies" = ["BigB", "LDShadowLady", "Rendog", "ZombieCleo"]
+"Magical Mountain" = ["GoodTimesWithScar", "SmallishBeans"]
+"Scottage Alliance" = ["PearlescentMoon", "Dangthatsalongname", "ZombieCleo"]
+"The Southlanders" = ["Grian", "impulseSV", "InTheLittleWood", "Mumbo Jumbo", "Solidarity"]
+"Team B.E.S.T." = ["BdoubleO100", "Etho", "Skizzleman", "Tango Tek"]
+"Shadow Alliance" = ["BigB", "InTheLittleWood", "LDShadowLady", "Rendog"]
+"The Deadliest Duo" = ["Grian", "SmallishBeans"]
+"Shadow-Scottage Alliance" = ["Etho", "InTheLittleWood", "PearlescentMoon", "Rendog", "Dangthatsalongname", "ZombieCleo"]
 # Past Life Series installments (from the-life-series.fandom.com). `starts` is a few days before the
 # first session, `ends` ~6 weeks after the last. Substitutes are listed after the regular roster.
 
@@ -230,6 +298,13 @@ starts = "2021-04-16"
 ends = "2021-07-20"
 members = ["BdoubleO100", "BigB", "Etho", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Rendog", "Skizzleman",
            "Dangthatsalongname", "SmallishBeans", "Solidarity", "Tango Tek", "ZombieCleo", "impulseSV"]
+
+[collection.teams]   # factions, from the Life Series wiki
+"Crastle Alliance" = ["BdoubleO100", "impulseSV", "ZombieCleo"]
+"Desert Duo" = ["GoodTimesWithScar", "Grian"]
+"Dogwarts" = ["InTheLittleWood", "Rendog", "BigB", "Etho", "Skizzleman", "impulseSV", "SmallishBeans"]
+"Flower Husbands" = ["Dangthatsalongname", "Solidarity"]
+"The Swamp" = ["Etho", "impulseSV", "Tango Tek"]
 [[hermit]]
 name = "BdoubleO100"
 short = "Bdubs"
