@@ -307,13 +307,13 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
     roster = []
     for h in cfg.hermits:
         has_avatar = _avatar(avatars.get(h.slug), out / "avatars" / f"{h.slug}.jpg")
-        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in words,
+        roster.append({"slug": h.slug, "name": h.name, "short": h.short, "url": h.url, "present": h.slug in words, "guest": h.guest,
                        "avatar": f"avatars/{h.slug}.jpg" if has_avatar else None})
 
     meta = {
         "generated": int(time.time()),
         "site": cfg.site_url,
-        "collections": [c.name for c in cfg.collections],
+        "collections": [c.name for c in cfg.collections if starts[c.name]],    # one with no episodes yet stays hidden
         "teams": {c.name: c.teams for c in cfg.collections if c.teams},
         "hermits": roster,
         "lexicon": text.LEXICON,

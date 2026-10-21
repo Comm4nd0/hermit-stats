@@ -231,3 +231,18 @@ def test_discovery_never_holds_a_write_across_youtube_requests(tmp_path, monkeyp
     assert cli._discover(conn, cfg, HERMITS[2], None) == 8
     assert len(calls) == 6 and not any(calls)     # no uncommitted write while YouTube was asked
     assert not conn.in_transaction
+
+
+def test_discovery_skips_collections_the_channel_is_not_in(tmp_path, monkeypatch):
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
+        "id": "UCm", "name": "Martyn", "avatar_url": None, "playlists": [("PL1", "Hermitcraft 11"), ("PL2", "Nice Life")]})
+    monkeypatch.setattr(youtube, "list_playlist", lambda pid, *a, **k: [{"id": pid, "title": "Ep 1", "upload_date": "20251205"}])
+    monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
+    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], guest=True)
+    cfg = Config([Collection("Season 11", re.compile("hermitcraft"), None),
+                  Collection("Nice Life", re.compile("nice life", re.I), None, members=["inthelittlewood"])],
+                 [martyn], None, None)
+    assert cli._discover(conn, cfg, martyn, None) == 1
+    assert [r[0] for r in conn.execute("SELECT collection FROM collection_videos")] == ["Nice Life"]

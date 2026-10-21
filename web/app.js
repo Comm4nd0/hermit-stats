@@ -47,6 +47,8 @@ const scope = () => state.sel.length ? state.sel : present();           // hermi
 const vids = () => { const s = new Set(scope()); return collVids().filter(v => s.has(v.h)); };
 const comparing = () => state.sel.length >= 1 && state.sel.length <= MAX_COMPARE;
 const color = slug => { const i = comparing() ? state.sel.indexOf(slug) : -1; return i >= 0 ? css(`--s${i + 1}`) : css('--s1'); };
+// A season with non-Hermits in it (a Life series) calls everyone players.
+const people = () => present().some(s => H[s].guest) ? 'players' : 'Hermits';
 const seasonTeams = () => Object.entries(META.teams?.[state.coll] ?? {});
 const byHermit = list => { const m = {}; for (const v of list) (m[v.h] ??= []).push(v); return m; };
 const name = slug => H[slug]?.short ?? slug;
@@ -285,10 +287,10 @@ const teamPressed = members => {
 };
 
 function selectionLabel() {
-  if (!state.sel.length) return 'All Hermits';
+  if (!state.sel.length) return `All ${people()}`;
   const team = seasonTeams().find(([, m]) => teamPressed(m));
-  if (team) return `${team[0]} (${state.sel.length} Hermits)`;
-  return state.sel.length <= MAX_COMPARE ? state.sel.map(name).join(', ') : `${state.sel.length} Hermits`;
+  if (team) return `${team[0]} (${state.sel.length} ${people()})`;
+  return state.sel.length <= MAX_COMPARE ? state.sel.map(name).join(', ') : `${state.sel.length} ${people()}`;
 }
 
 function readHash() {
@@ -321,7 +323,8 @@ function drawFilters() {
   const box = $('#hermits');
   box.innerHTML = '';
   const all = document.createElement('button');
-  all.type = 'button'; all.className = 'chip all'; all.textContent = 'All Hermits';
+  all.type = 'button'; all.className = 'chip all'; all.textContent = `All ${people()}`;
+  $('#people').textContent = people() === 'players' ? 'Players' : 'Hermits';
   all.setAttribute('aria-pressed', String(!state.sel.length));
   all.onclick = () => { state.sel = []; state.ep = null; update(); };
   box.appendChild(all);
@@ -361,7 +364,7 @@ function drawFilters() {
   $('#sel-hint').textContent = !state.sel.length ? '— all of them; pick up to 3 to compare'
     : state.sel.length > MAX_COMPARE ? `— ${state.sel.length} selected, shown together` : '— click again to deselect';
   const list = collVids();
-  $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} Hermits`;
+  $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} ${people()}`;
   $('#sel-summary').textContent = `${state.coll} · ${selectionLabel()}`;
   const panel = state.ep ? 'episode' : state.tab;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === panel));

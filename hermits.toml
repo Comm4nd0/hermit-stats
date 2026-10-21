@@ -6,11 +6,13 @@
 #                 Both are case-insensitive regular expressions. Playlists / titles matching `skip` (livestreams,
 #                 shorts) are left out, and so is anything uploaded before `starts`. `teams` (optional) names
 #                 groups of Hermits that can be selected together: { "Team" = ["Hermit name", ...] }.
+#                 `members` (optional) limits whose channels are searched; without it, every Hermit except guests.
 #
 # [[hermit]]      one YouTube channel; `short` is the name used on charts. `aliases` are what other Hermits call them on camera (plus common
 #                 auto-caption mishearings); a spoken alias in someone else's video counts as a mention.
 #                 `exclude` lists phrases that contain an alias but aren't about the Hermit
 #                 ("ender pearl" is not Pearl). `playlists` adds playlists by hand: { "Season 11" = "PL..." }.
+#                 `guest = true` for a non-Hermit: only searched for the collections whose `members` name them.
 
 [deploy]
 target = "luma:/root/caddy/static/hermit-stats/"
@@ -36,6 +38,26 @@ playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 skip = 'stream|shorts|\blive\b'
 starts = "2023-03-01"
+
+# The Life Series: many players keep no playlist for it, so titles matter more; their compilations,
+# reactions and "The Movie" recuts are left out.
+[[collection]]
+name = "Final Life"
+playlist = 'final\s*life'
+video_title = '\bfinal\s*life\b'
+skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut'
+starts = "2026-10-23"
+members = ["Bigbst4tz2", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Mumbo Jumbo",
+           "PearlescentMoon", "SmallishBeans", "Solidarity", "ZombieCleo"]
+
+[[collection]]
+name = "Nice Life"
+playlist = 'nice\s*life'
+video_title = '\bnice\s*life\b'
+skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut'
+starts = "2025-11-15"
+members = ["SmallishBeans", "Smajor1995", "Rendog", "InTheLittleWood", "GeminiTay", "Solidarity", "Bigbst4tz2",
+           "Grian", "ZombieCleo", "GoodTimesWithScar", "PearlescentMoon", "Skizzleman", "BdoubleO100", "impulseSV"]
 
 [[hermit]]
 name = "BdoubleO100"
@@ -196,3 +218,33 @@ name = "ZombieCleo"
 short = "Cleo"
 channel = "@ZombieCleo"
 aliases = ["cleo", "zombie cleo", "zombiecleo", "clio"]
+
+# Life Series players who aren't Hermits.
+
+[[hermit]]
+name = "Bigbst4tz2"
+short = "BigB"
+channel = "@Bigbst4tz22"
+aliases = ["bigb", "big b", "bigbst4tz2", "big bee"]
+guest = true
+
+[[hermit]]
+name = "InTheLittleWood"
+short = "Martyn"
+channel = "@martyn"
+aliases = ["martyn", "martin", "inthelittlewood", "in the little wood"]
+guest = true
+
+[[hermit]]
+name = "Smajor1995"
+short = "Scott"
+channel = "@Dangthatsalongname"
+aliases = ["scott", "smajor", "scott smajor", "s major", "scotty"]
+guest = true
+
+[[hermit]]
+name = "Solidarity"
+short = "Jimmy"
+channel = "@SolidarityGaming"
+aliases = ["jimmy", "solidarity", "jimbo"]
+guest = true

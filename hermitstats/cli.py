@@ -47,6 +47,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
     found = 0
     uploads = recent = None
     for coll in cfg.collections:
+        if not coll.includes(hermit):
+            continue
         picked = [(pid, title) for pid, title in info["playlists"] if coll.playlist.search(title) and coll.wants(title)]
         manual = hermit.playlists.get(coll.name)
         if manual:
@@ -235,7 +237,7 @@ def cmd_import(args) -> int:
         for v in src.execute(
                 """SELECT v.*, t.source, t.language, t.segments FROM videos v
                    JOIN transcripts t ON t.video_id = v.id WHERE v.channel = ?""", (ch["id"],)):
-            colls = [c for c in cfg.collections if c.video_title and c.video_title.search(v["title"] or "")
+            colls = [c for c in cfg.collections if c.includes(h) and c.video_title and c.video_title.search(v["title"] or "")
                      and c.wants(v["title"], v["upload_date"])]
             if not colls:
                 continue
