@@ -47,7 +47,7 @@ playlist = 'final\s*life'
 video_title = '\bfinal\s*life\b'
 skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut'
 starts = "2026-10-23"
-members = ["Bigbst4tz2", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Mumbo Jumbo",
+members = ["BigB", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Mumbo Jumbo",
            "PearlescentMoon", "SmallishBeans", "Solidarity", "ZombieCleo"]
 
 [[collection]]
@@ -56,7 +56,7 @@ playlist = 'nice\s*life'
 video_title = '\bnice\s*life\b'
 skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut'
 starts = "2025-11-15"
-members = ["SmallishBeans", "Smajor1995", "Rendog", "InTheLittleWood", "GeminiTay", "Solidarity", "Bigbst4tz2",
+members = ["SmallishBeans", "Dangthatsalongname", "Rendog", "InTheLittleWood", "GeminiTay", "Solidarity", "BigB",
            "Grian", "ZombieCleo", "GoodTimesWithScar", "PearlescentMoon", "Skizzleman", "BdoubleO100", "impulseSV"]
 
 [[hermit]]
@@ -219,10 +219,10 @@ short = "Cleo"
 channel = "@ZombieCleo"
 aliases = ["cleo", "zombie cleo", "zombiecleo", "clio"]
 
-# Life Series players who aren't Hermits.
+# Life Series players who aren't Hermits. `name` is their channel's name; `short` what everyone calls them.
 
 [[hermit]]
-name = "Bigbst4tz2"
+name = "BigB"
 short = "BigB"
 channel = "@Bigbst4tz22"
 aliases = ["bigb", "big b", "bigbst4tz2", "big bee"]
@@ -236,7 +236,7 @@ aliases = ["martyn", "martin", "inthelittlewood", "in the little wood"]
 guest = true
 
 [[hermit]]
-name = "Smajor1995"
+name = "Dangthatsalongname"
 short = "Scott"
 channel = "@Dangthatsalongname"
 aliases = ["scott", "smajor", "scott smajor", "s major", "scotty"]

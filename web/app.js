@@ -52,6 +52,8 @@ const people = () => present().some(s => H[s].guest) ? 'players' : 'Hermits';
 const seasonTeams = () => Object.entries(META.teams?.[state.coll] ?? {});
 const byHermit = list => { const m = {}; for (const v of list) (m[v.h] ??= []).push(v); return m; };
 const name = slug => H[slug]?.short ?? slug;
+// Channel name, plus what everyone calls them when the channel name doesn't say it (Solidarity (Jimmy)).
+const fullName = slug => { const h = H[slug]; return h.name.toLowerCase().includes(h.short.toLowerCase()) ? h.name : `${h.name} (${h.short})`; };
 
 function weekOf(d) {     // Monday of the ISO week, as YYYY-MM-DD
   const t = new Date(d + 'T00:00:00Z');
@@ -331,7 +333,7 @@ function drawFilters() {
   for (const slug of present()) {
     const h = H[slug];
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip'; b.title = h.name;
+    b.type = 'button'; b.className = 'chip'; b.title = fullName(slug);
     b.setAttribute('aria-pressed', String(state.sel.includes(slug)));
     if (h.avatar) { const img = new Image(); img.src = h.avatar; img.alt = ''; img.loading = 'lazy'; b.appendChild(img); }
     else { const d = document.createElement('span'); d.className = 'dot'; b.appendChild(d); }
@@ -1024,7 +1026,7 @@ function shareCard(slug, doc, img) {
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = HT; cv.className = 'share-canvas';
   cv.setAttribute('role', 'img');
-  cv.setAttribute('aria-label', `${H[slug].name}, ${state.coll}: ` + [...stats.map(([v, k]) => `${v} ${k}`), ...facts.map(([k, v]) => `${k} ${v}`)].join(', '));
+  cv.setAttribute('aria-label', `${fullName(slug)}, ${state.coll}: ` + [...stats.map(([v, k]) => `${v} ${k}`), ...facts.map(([k, v]) => `${k} ${v}`)].join(', '));
   const x = cv.getContext('2d');
   x.fillStyle = css('--surface'); x.fillRect(0, 0, W, HT);
   x.fillStyle = color(slug); x.fillRect(0, 0, W, 12);
@@ -1033,8 +1035,8 @@ function shareCard(slug, doc, img) {
   }
   const text = (s, px, weight, ink, tx, ty, maxW) => { x.font = `${weight} ${px}px ${F}`; x.fillStyle = css(ink); x.fillText(maxW ? fitText(x, s, maxW) : s, tx, ty); };
   const left = img ? 232 : 64;
-  text(H[slug].name, 64, 700, '--ink', left, 132, W - left - 64);
-  text(`Hermitcraft ${state.coll}`, 30, 400, '--ink-2', left, 180);
+  text(fullName(slug), 64, 700, '--ink', left, 132, W - left - 64);
+  text(people() === 'Hermits' ? `Hermitcraft ${state.coll}` : state.coll, 30, 400, '--ink-2', left, 180);
   stats.forEach(([v, k], i) => { text(v, 56, 650, '--ink', 64 + i * 272, 306); text(k, 24, 400, '--ink-2', 64 + i * 272, 342, 250); });
   x.fillStyle = css('--grid'); x.fillRect(64, 378, W - 128, 2);
   facts.forEach(([k, v], i) => {
@@ -1063,7 +1065,7 @@ function shareCard(slug, doc, img) {
     sh.type = 'button'; sh.className = 'ghost'; sh.textContent = 'Share…';
     sh.onclick = async () => {
       const f = new File([await blob()], file, { type: 'image/png' });
-      navigator.share({ files: [f], title: `${H[slug].name} · Hermit Stats`, text: location.href }).catch(() => { /* cancelled */ });
+      navigator.share({ files: [f], title: `${fullName(slug)} · Hermit Stats`, text: location.href }).catch(() => { /* cancelled */ });
     };
     bar.appendChild(sh);
   }
