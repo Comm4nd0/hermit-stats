@@ -13,8 +13,9 @@ const full = n => n == null ? '—' : Number(n).toLocaleString('en-GB', { maximu
 const sum = (a, f) => a.reduce((t, x) => t + (f(x) || 0), 0);
 const hours = s => s / 3600;
 const MAX_COMPARE = 3;
+const narrow = () => matchMedia('(max-width: 640px)').matches;      // phone layout
 
-const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', ep: null };
+const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', ep: null, card: null };
 let META, VIDEOS, H = {};
 let VISIT = { prev: null };       // when this browser last looked (unix seconds), for "new since your last visit"
 const cache = { words: {}, trans: {}, eps: {}, vids: {} };
@@ -115,10 +116,11 @@ const VIEW_NAMES = { bar: 'Bars', line: 'Lines', scatter: 'Dots', heatmap: 'Heat
 /** A card: title, subtitle, optional tools, a chart (or custom HTML) and a table view of the same numbers. */
 function card(container, spec) {
   const el = document.createElement('section');
-  el.className = 'card' + (spec.wide ? ' wide' : '');
+  el.className = 'card' + (spec.wide ? ' wide' : '') + (spec.feature ? ' feature' : '');
   el.innerHTML = `<header><div><h3></h3><p class="sub"></p></div><div class="tools"></div></header>
     <div class="body"></div><div class="tablewrap" hidden></div>`;
   $('h3', el).textContent = words4(spec.title);
+  el.dataset.share = slugify(words4(spec.title));
   $('.sub', el).textContent = words4(spec.sub || '');
   container.appendChild(el);
   const tools = $('.tools', el);
@@ -159,12 +161,19 @@ function card(container, spec) {
     tools.appendChild(btn);
     if (result.tableOnly) { btn.click(); btn.remove(); }
   }
+  if (state.ep || state.tab !== 'status') tools.appendChild(shareButton(() => shareOpts(el)));
 }
 
-/** Sortable table. cols: [{k, label, n (numeric), f (format), link (row => url), internal (link stays on the page)}] */
+/** Sortable table, a page of rows at a time. cols: [{k, label, n (numeric), f (format), link (row => url),
+    internal (link stays on the page), nowrap}] */
+const PAGE = 25;
 function table({ cols, rows }) {
-  const t = document.createElement('table');
-  let sortK = null, dir = -1;
+  const wrap = document.createElement('div'), t = document.createElement('table');
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'more';
+  more.onclick = () => { shown += 100; draw(); };
+  wrap.append(t, more);
+  let sortK = null, dir = -1, shown = PAGE;
   const draw = () => {
     const data = sortK == null ? rows : [...rows].sort((a, b) => {
       const x = a[sortK], y = b[sortK];
@@ -180,11 +189,11 @@ function table({ cols, rows }) {
       head.appendChild(th);
     }
     const tb = t.createTBody();
-    for (const r of data) {
+    for (const r of data.slice(0, shown)) {
       const tr = tb.insertRow();
       for (const c of cols) {
         const td = tr.insertCell();
-        if (c.n) td.className = 'n';
+        td.className = [c.n && 'n', c.nowrap && 'nowrap'].filter(Boolean).join(' ');
         const val = c.f ? c.f(r[c.k], r) : (c.n ? full(r[c.k]) : r[c.k] ?? '');
         if (c.link) {
           const a = document.createElement('a');
@@ -194,9 +203,31 @@ function table({ cols, rows }) {
         } else td.textContent = val;
       }
     }
+    more.hidden = data.length <= shown;
+    more.textContent = `Show ${Math.min(100, data.length - shown)} more of ${full(data.length - shown)}`;
   };
   draw();
-  return t;
+  return wrap;
+}
+
+/** Show a long list's first n items, with a button for the rest. */
+function pageList(ul, n) {
+  const items = [...ul.children];
+  if (items.length <= n) return ul;
+  items.slice(n).forEach(li => { li.hidden = true; });
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'more';
+  let shown = n;
+  const label = () => { more.textContent = `Show ${Math.min(n * 4, items.length - shown)} more of ${full(items.length - shown)}`; };
+  more.onclick = () => {
+    items.slice(shown, shown + n * 4).forEach(li => { li.hidden = false; });
+    shown += n * 4;
+    if (shown >= items.length) more.remove(); else label();
+  };
+  label();
+  const box = document.createElement('div');
+  box.append(ul, more);
+  return box;
 }
 
 /** Ranked horizontal bars. items: [{name, value, slug?, extra?}] */
@@ -299,13 +330,6 @@ const teamPressed = members => {
   return m.length > 0 && m.length === state.sel.length && m.every(s => state.sel.includes(s));
 };
 
-function selectionLabel() {
-  if (!state.sel.length) return `All ${people()}`;
-  const team = seasonTeams().find(([, m]) => teamPressed(m));
-  if (team) return `${team[0]} (${state.sel.length} ${people()})`;
-  return state.sel.length <= MAX_COMPARE ? state.sel.map(name).join(', ') : `${state.sel.length} ${people()}`;
-}
-
 function readHash() {
   const q = new URLSearchParams(location.hash.slice(1));
   if (q.get('tab')) state.tab = q.get('tab');
@@ -313,6 +337,7 @@ function readHash() {
   state.sel = (q.get('h') || '').split(',').filter(s => H[s]);
   state.search = q.get('q') || '';
   state.ep = q.get('ep') || null;          // checked against the season once it's loaded
+  state.card = q.get('card') || null;      // a shared card or tile to scroll to, once drawn
 }
 /** The URL hash for a state (the current one, or one with some fields changed). */
 function hashFor(changes = {}) {
@@ -322,6 +347,7 @@ function hashFor(changes = {}) {
   if (s.sel.length) q.set('h', s.sel.join(','));
   if (s.tab === 'search' && s.search) q.set('q', s.search);
   if (s.ep) q.set('ep', s.ep);
+  if (s.card) q.set('card', s.card);
   return '#' + q.toString();
 }
 function writeHash() { history.replaceState(null, '', hashFor()); }
@@ -381,25 +407,45 @@ function drawFilters() {
   const list = collVids();
   $('#summary').textContent = `${state.coll} · ${full(list.length)} episodes · ${full(Math.round(hours(sum(list, v => v.dur))))} hours · ${present().length} ${people()}` + (hermitcraft() ? '' : ` (${present().filter(s => !friend(s)).length} Hermits, ${present().filter(friend).length} friends of the Hermits)`);
   $('#search-hint').textContent = `Counts every time a word or phrase is said in the selected ${people()}' episodes, and lists each moment with a link straight to it.`;
-  $('#sel-summary').textContent = `${state.coll} · ${selectionLabel()}`;
   const panel = state.ep ? 'episode' : state.tab;
   for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === panel));
   for (const p of document.querySelectorAll('[data-panel]')) p.classList.toggle('on', p.dataset.panel === panel);
   document.body.classList.toggle('page-status', panel === 'status');     // the status page isn't per season or Hermit
+  chipRows();
 }
 
-let renderToken = 0;
+/** In the compact bar each chip row scrolls sideways: bring the first selected chip into view, and fade the
+    ends that have more chips past them. */
+function chipRows(reveal = true) {
+  for (const box of document.querySelectorAll('#bar .chips')) {
+    const on = box.querySelector('[aria-pressed="true"]:not(.all)');
+    if (reveal && on && $('#bar').classList.contains('compact')) {
+      const l = on.offsetLeft - box.offsetLeft, r = l + on.offsetWidth;
+      if (l < box.scrollLeft || r > box.scrollLeft + box.clientWidth) box.scrollLeft = l - 48;
+    }
+    box.classList.toggle('more-l', box.scrollLeft > 2);
+    box.classList.toggle('more-r', box.scrollLeft + box.clientWidth < box.scrollWidth - 2);
+  }
+}
+
+let renderToken = 0, lastPanel = null;
 async function update() {
+  const panel = state.ep ? 'episode' : state.tab;
+  if (panel !== lastPanel && scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 });   // a different page starts at its top
+  lastPanel = panel;
   writeHash();
   drawFilters();
-  const token = ++renderToken;
-  $('#main').classList.add('loading');
+  const token = ++renderToken, main = $('#main');
+  // Hold the page's height while the panel is emptied and redrawn, so changing the season or the Hermits
+  // keeps you at the same chart instead of the browser clamping the scroll position.
+  main.style.minHeight = main.offsetHeight + 'px';
+  main.classList.add('loading');
   try {
     await (state.ep ? episodePage : TABS[state.tab])?.(token);
   } catch (e) {
     console.error(e);
   }
-  if (token === renderToken) $('#main').classList.remove('loading');
+  if (token === renderToken) { main.classList.remove('loading'); main.style.minHeight = ''; showShared(); }
 }
 
 function reset(id, token) {
@@ -486,10 +532,10 @@ const TABS = {
     const [docs, faces] = await Promise.all([Promise.all(sharing.map(words)), Promise.all(sharing.map(s => loadImage(H[s].avatar)))]);
     const el = reset('overview-cards', token);
     if (!el) return;
-    tiles.innerHTML = t.map(([k, v]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+    tiles.innerHTML = t.map(([k, v]) => tileHTML(k, v)).join('');
 
     const news = whatsNew();
-    if (news) card(el, { title: news.title, sub: news.sub, wide: true, build: () => ({ html: news.html }) });
+    if (news) card(el, { title: news.title, sub: news.sub, wide: true, feature: true, build: () => ({ html: news.html }) });
     if (sharing.length) {
       card(el, { title: sharing.length === 1 ? 'Share card' : 'Share cards', wide: true,
         sub: `${state.coll} in one picture, for Reddit, Discord or anywhere else`,
@@ -622,7 +668,7 @@ const TABS = {
     for (const v of all) for (const [k, c] of Object.entries(v.m)) if (H[k]) pair[v.h + '>' + k] = (pair[v.h + '>' + k] || 0) + c;
 
     card(el, { title: 'Who talks about whom', wide: true, height: 560,
-      sub: 'Each Hermit’s three most-named connections (all of them for selected Hermits). Line thickness = how often the two name each other on camera; circle size = how often a Hermit is named. Drag to rearrange, click to select.',
+      sub: 'Each Hermit’s three most-named connections (all of them for selected Hermits). Line thickness = how often the two name each other on camera; circle size = how often a Hermit is named. ' + (narrow() ? 'Tap to select.' : 'Drag to rearrange, click to select.'),
       build: () => {
         const nodesSet = new Set(ps);
         for (const k of Object.keys(pair)) { const b = k.split('>')[1]; if (H[b]) nodesSet.add(b); }
@@ -650,6 +696,7 @@ const TABS = {
             lineStyle: { width: 0.5 + 7 * c / maxE, color: hot ? css('--seq-2') : css('--grid'), opacity: hot ? 0.55 : 0.35, curveness: 0.12 } };
         });
         return {
+          height: narrow() ? 420 : 560,
           option: {
             ...base(),
             tooltip: { ...base().tooltip, formatter: p => p.dataType === 'edge'
@@ -658,7 +705,7 @@ const TABS = {
                 `<br>${esc(name(p.data.target))} → ${esc(name(p.data.source))}: ${full(pair[p.data.target + '>' + p.data.source] || 0)}`)
               : tip(full(p.data.value), `times ${p.data.name} is named by others`) },
             series: [{
-              type: 'graph', layout: 'force', roam: false, draggable: true, data: nodes, links,
+              type: 'graph', layout: 'force', roam: false, draggable: !narrow(), data: nodes, links,
               force: { repulsion: 450, edgeLength: [60, 180], gravity: 0.15, friction: 0.2 },
               emphasis: { focus: 'adjacency', lineStyle: { opacity: 0.9 } }, labelLayout: { hideOverlap: true },
             }],
@@ -674,11 +721,24 @@ const TABS = {
     mode.innerHTML = `<option value="rate"${state.heat === 'rate' ? ' selected' : ''}>per hour</option><option value="raw"${state.heat === 'raw' ? ' selected' : ''}>total</option>`;
     mode.onchange = () => { state.heat = mode.value; update(); };
     card(el, { title: 'Mention matrix', wide: true, tools: [mode],
-      sub: state.heat === 'rate' ? 'Row = whose episodes, column = who gets named · mentions per hour of the row Hermit’s footage'
+      sub: narrow() ? `Who each Hermit names most in their episodes · ${state.heat === 'rate' ? 'mentions per hour of their footage' : 'total mentions'}`
+        : state.heat === 'rate' ? 'Row = whose episodes, column = who gets named · mentions per hour of the row Hermit’s footage'
         : 'Row = whose episodes, column = who gets named · total mentions',
       height: Math.max(260, scope().length * 26 + 110),
       build: () => {
         const rowsH = scope().filter(s => g[s]), cols = ps;
+        const tableSpec = { cols: [{ k: 'a', label: 'In episodes of' }, ...cols.map(b => ({ k: b, label: name(b), n: true }))],
+          rows: rowsH.map(a => Object.fromEntries([['a', name(a)], ...cols.map(b => [b, a === b ? null : pair[a + '>' + b] || 0])])) };
+        if (narrow()) {      // too many columns for a phone: each Hermit's three most-named instead
+          const val = (a, b) => state.heat === 'rate' ? (hrs[a] ? (pair[a + '>' + b] || 0) / hrs[a] : 0) : pair[a + '>' + b] || 0;
+          const show = v => state.heat === 'rate' ? v.toFixed(1) + '/h' : full(v);
+          const face = s => H[s]?.avatar ? `<img src="${esc(H[s].avatar)}" alt="" loading="lazy">` : '<span class="dot"></span>';
+          const html = rowsH.map(a => {
+            const top = cols.filter(b => b !== a && val(a, b) > 0).sort((x, y) => val(a, y) - val(a, x)).slice(0, 3);
+            return `<li>${face(a)}<b>${esc(name(a))}</b><span class="to">${top.length ? top.map(b => `${esc(name(b))} <span class="muted">${esc(show(val(a, b)))}</span>`).join(' · ') : '<span class="muted">Nobody</span>'}</span></li>`;
+          }).join('');
+          return { html: `<ul class="names">${html}</ul>`, table: tableSpec };
+        }
         const data = [];
         let max = 0;
         rowsH.forEach((a, y) => cols.forEach((b, x) => {
@@ -700,8 +760,7 @@ const TABS = {
               inRange: { color: [css('--seq-0'), css('--seq-1'), css('--seq-2'), css('--seq-3'), css('--seq-4')] } },
             series: [{ type: 'heatmap', data, itemStyle: { borderColor: css('--surface'), borderWidth: 2, borderRadius: 3 }, emphasis: { itemStyle: { borderColor: css('--ink') } } }],
           },
-          table: { cols: [{ k: 'a', label: 'In episodes of' }, ...cols.map(b => ({ k: b, label: name(b), n: true }))],
-            rows: rowsH.map(a => Object.fromEntries([['a', name(a)], ...cols.map(b => [b, a === b ? null : pair[a + '>' + b] || 0])])) },
+          table: tableSpec,
         };
       } });
 
@@ -724,9 +783,9 @@ const TABS = {
           return {
             option: {
               ...base(),
-              grid: { left: 8, right: 16, top: 8, bottom: 48, containLabel: true },
+              grid: { left: 8, right: 16, top: 8, bottom: narrow() ? 64 : 48, containLabel: true },
               tooltip: { ...base().tooltip, formatter: p => tip(p.value[2].toFixed(2) + ' / hour', `${tn[p.value[0]]} named in ${tn[p.value[1]]}’s episodes`, `<br>${full(p.value[3])} times in total`) },
-              xAxis: axis({ type: 'category', data: tn, axisLabel: { color: css('--ink-2'), interval: 0 }, axisLine: { show: false } }),
+              xAxis: axis({ type: 'category', data: tn, axisLabel: { color: css('--ink-2'), interval: 0, rotate: narrow() ? 35 : 0 }, axisLine: { show: false } }),
               yAxis: axis({ type: 'category', data: tn, inverse: true, axisLabel: { color: css('--ink-2') }, axisLine: { show: false } }),
               visualMap: { dimension: 2, min: 0, max: max || 1, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 140,
                 text: ['more', 'fewer'], textStyle: { color: css('--muted') },
@@ -843,8 +902,9 @@ const TABS = {
         xAxis: axis({ type: xType, name: xName, nameLocation: 'middle', nameGap: 28, nameTextStyle: { color: css('--muted') }, splitLine: { show: xType !== 'time', lineStyle: { color: css('--grid') } } }),
         yAxis: axis({ type: yType, name: yName, nameTextStyle: { color: css('--muted'), align: 'left' }, axisLabel: { color: css('--muted'), formatter: v => fmt(v) } }),
         series: groups.map(([s, l]) => ({
-          type: 'scatter', name: s ? name(s) : 'Episodes', symbolSize: 8,
-          itemStyle: { color: s ? color(s) : css('--s1'), opacity: 0.75, borderColor: css('--surface'), borderWidth: 2 },
+          type: 'scatter', name: s ? name(s) : 'Episodes', symbolSize: 6,
+          itemStyle: { color: s ? color(s) : css('--s1'), opacity: groups.length > 1 ? 0.65 : 0.45 },
+          emphasis: { itemStyle: { opacity: 1, borderColor: css('--ink'), borderWidth: 1 } },
           data: l.filter(v => yf(v) != null && xf(v) != null && (yType !== 'log' || yf(v) > 0)).map(v => ({ value: [xf(v), yf(v)], v })),
         })),
       },
@@ -857,10 +917,10 @@ const TABS = {
       build: () => list.length ? scatter(v => v.d, 'time', '', v => v.v && v.l != null ? +(1000 * v.l / v.v).toFixed(1) : null, 'likes / 1k views') : null });
     card(el, { title: 'Every episode', wide: true, sub: 'Click a column to sort; a title opens that episode’s stats',
       build: () => ({ tableOnly: true, table: {
-        cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'd', label: 'Date' }, { k: 't', label: 'Title', link: r => epHref(r.id), internal: true },
+        cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'd', label: 'Date', nowrap: true, f: v => v ? longDate(v) : '' }, { k: 't', label: 'Title', link: r => epHref(r.id), internal: true },
           { k: 'watch', label: '', link: r => ytUrl(r.id), f: () => 'Watch' },
           { k: 'min', label: 'Minutes', n: true }, { k: 'v', label: 'Views', n: true }, { k: 'l', label: 'Likes', n: true }, { k: 'cm', label: 'Comments', n: true },
-          { k: 'w', label: 'Words', n: true }, { k: 'wpm', label: 'Words/min', n: true }, { k: 'mentions', label: 'Hermits named', n: true }, { k: 'top', label: 'Most named' }],
+          { k: 'w', label: 'Words', n: true }, { k: 'wpm', label: 'Words/min', n: true }, { k: 'mentions', label: 'Mentions of Hermits', n: true }, { k: 'top', label: 'Most named' }],
         rows: [...list].sort((a, b) => (b.d || '').localeCompare(a.d || '')).map(v => {
           const top = Object.entries(v.m).sort((a, b) => b[1] - a[1])[0];
           return { ...v, hermit: H[v.h].short, min: Math.round(v.dur / 60), mentions: sum(Object.values(v.m), x => x), top: top ? `${name(top[0])} (${top[1]})` : '' };
@@ -959,7 +1019,7 @@ const TABS = {
           li.append(meta, p);
           ul.appendChild(li);
         }
-        return { node: ul };
+        return { node: pageList(ul, 50) };
       } });
   },
 };
@@ -1010,6 +1070,140 @@ function whatsNew() {
     <div><h4>Episodes</h4>${epList}</div>
     <div><h4>Talking about each other for the first time this season</h4>${pairList}</div>
     <div><h4>Words of the week</h4>${ww}</div></div>` };
+}
+
+/* ---------------------------------------------------------------- sharing a card or tile */
+
+const slugify = t => t.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const siteName = () => (META.site || location.origin).replace(/^https?:\/\//, '');
+/** What a shared picture is of: the season and who's selected, or the episode. */
+function shareContext() {
+  if (state.ep) { const v = VIDEOS.find(x => x.id === state.ep); return `${name(v.h)} · ${v.t}`; }
+  const s = hermitcraft() ? `Hermitcraft ${state.coll}` : `${season().series}: ${state.coll}`;
+  if (!state.sel.length) return `${s} · all ${people()}`;
+  const team = seasonTeams().find(([, m]) => teamPressed(m));
+  return `${s} · ` + (team ? team[0] : state.sel.length <= MAX_COMPARE ? state.sel.map(name).join(', ') : `${state.sel.length} ${people()}`);
+}
+const shareFile = id => `hermit-stats-${slugify(state.coll)}-${id}.png`;
+
+function tileHTML(k, v, extra = '') {
+  const id = 'tile-' + slugify(k);
+  return `<div class="tile" data-share="${esc(id)}"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div>${extra}
+    <button type="button" class="tile-share" aria-label="Share “${esc(k)}”" title="Share">${SHARE_ICON}</button></div>`;
+}
+const SHARE_ICON = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5v9M4.5 5 8 1.5 11.5 5M3 8.5v5h10v-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function shareButton(opts) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'share-btn'; b.title = 'Share this as a picture or a link';
+  b.innerHTML = `${SHARE_ICON} Share`;
+  b.onclick = e => { e.stopPropagation(); openShare(b, opts()); };
+  return b;
+}
+
+let h2i;
+const loadH2I = () => h2i ??= new Promise((res, rej) => {
+  const sc = document.createElement('script');
+  sc.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
+  sc.onload = () => res(window.htmlToImage); sc.onerror = () => { h2i = null; rej(new Error('could not load html-to-image')); };
+  document.head.appendChild(sc);
+});
+
+/** A card as a picture: the card itself, with what it's of above and the site's name below. */
+function shareOpts(el) {
+  const id = el.dataset.share;
+  return { id, file: shareFile(id), title: $('h3', el).textContent, image: async () => {
+    const lib = await loadH2I();
+    const top = document.createElement('p'), foot = document.createElement('p');
+    top.className = 'cap-ctx'; top.textContent = shareContext();
+    foot.className = 'cap-foot'; foot.innerHTML = `<b>${esc(siteName())}</b><span>Unofficial fan project · from every episode’s captions</span>`;
+    // At most 900px wide, so the text in the picture stays readable on a wide screen.
+    const resize = () => el.querySelectorAll('.chart').forEach(d => echarts.getInstanceByDom(d)?.resize({ animation: { duration: 0 } }));
+    el.prepend(top); el.append(foot); el.classList.add('capturing');
+    if (el.offsetWidth > 900) { el.style.width = '900px'; resize(); await new Promise(r => setTimeout(r, 400)); }
+    try {
+      return await lib.toBlob(el, { pixelRatio: 2, backgroundColor: css('--surface'), cacheBust: false,
+        filter: n => !(n.classList?.contains('tools') || n.classList?.contains('more')) });
+    } finally {
+      top.remove(); foot.remove(); el.classList.remove('capturing');
+      if (el.style.width) { el.style.width = ''; resize(); }
+    }
+  } };
+}
+
+/** A number tile as a 1200×630 picture (the size link previews use). */
+function tileOpts(tile) {
+  const id = tile.dataset.share, v = $('.v', tile).textContent, k = $('.k', tile).textContent, cmp = $('.cmp', tile)?.textContent;
+  return { id, file: shareFile(id), title: `${v} ${k}`, image: () => {
+    const W = 1200, HT = 630, F = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = HT;
+    const x = cv.getContext('2d');
+    x.fillStyle = css('--surface'); x.fillRect(0, 0, W, HT);
+    x.fillStyle = css('--accent'); x.fillRect(0, 0, W, 12);
+    const text = (s, px, weight, ink, ty, maxW = W - 160) => { x.font = `${weight} ${px}px ${F}`; x.fillStyle = css(ink); x.fillText(fitText(x, s, maxW), 80, ty); };
+    text(shareContext(), 32, 500, '--ink-2', 110);
+    text(v, v.length > 8 ? 120 : 180, 700, '--ink', 330);
+    text(k, 52, 500, '--ink', 410);
+    if (cmp) text(cmp, 36, 400, '--muted', 466);
+    x.fillStyle = css('--grid'); x.fillRect(80, 528, W - 160, 2);
+    text(siteName(), 26, 600, '--accent', 584);
+    x.textAlign = 'right'; x.font = `400 22px ${F}`; x.fillStyle = css('--muted');
+    x.fillText('Unofficial fan project · from every episode’s captions', W - 80, 584);
+    return new Promise(res => cv.toBlob(res, 'image/png'));
+  } };
+}
+
+/** The share menu: copy a link that opens the site on this card, download the picture, or the phone's share sheet. */
+function openShare(btn, { id, file, title, image }) {
+  closeShare();
+  const url = location.origin + location.pathname + hashFor({ card: id });
+  const menu = document.createElement('div');
+  menu.className = 'share-menu'; menu.setAttribute('role', 'menu');
+  const item = (label, fn) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('role', 'menuitem'); b.textContent = label;
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await fn(b); } catch (e) { console.error(e); b.textContent = 'Something went wrong'; return; } finally { b.disabled = false; }
+    };
+    menu.appendChild(b);
+    return b;
+  };
+  item('Copy link', async b => { await navigator.clipboard.writeText(url); b.textContent = 'Link copied ✓'; setTimeout(closeShare, 900); });
+  item('Download image', async b => {
+    b.textContent = 'Making the picture…';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await image()); a.download = file; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    closeShare();
+  });
+  if (navigator.canShare?.({ files: [new File([''], file, { type: 'image/png' })] })) {
+    item('Share…', async b => {
+      b.textContent = 'Making the picture…';
+      const f = new File([await image()], file, { type: 'image/png' });
+      closeShare();
+      await navigator.share({ files: [f], title: `${title} · Hermit Stats`, text: url }).catch(() => { /* cancelled */ });
+    });
+  }
+  document.body.appendChild(menu);
+  const r = btn.getBoundingClientRect(), w = menu.offsetWidth;
+  menu.style.top = `${r.bottom + scrollY + 6}px`;
+  menu.style.left = `${Math.max(8, Math.min(r.right + scrollX - w, document.documentElement.clientWidth - w - 8))}px`;
+  menu.querySelector('button').focus();
+}
+const closeShare = () => document.querySelector('.share-menu')?.remove();
+
+/** After drawing, scroll to the card or tile a shared link points at, and flash it. */
+function showShared() {
+  if (!state.card) return;
+  const el = document.querySelector(`[data-panel].on [data-share="${CSS.escape(state.card)}"]`);
+  state.card = null;
+  writeHash();
+  if (!el) return;
+  el.scrollIntoView({ block: 'start' });
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 2200);
 }
 
 /* ---------------------------------------------------------------- share cards */
@@ -1120,7 +1314,7 @@ async function episodePage(token) {
   const tiles = [
     ['Words spoken', x => x.w, fmt], ['Words per minute', x => x.wpm, n => n.toFixed(0)],
     ['Vocabulary richness', x => x.r != null ? 100 * x.r : null, n => n.toFixed(1)], ['Minutes', x => x.dur / 60, n => n.toFixed(0)],
-    [words4('Hermits named'), named, fmt], ['Views', x => x.v, fmt], ['Likes per 1k views', likes, n => n.toFixed(1)],
+    [words4('Mentions of other Hermits'), named, fmt], ['Views', x => x.v, fmt], ['Likes per 1k views', likes, n => n.toFixed(1)],
   ];
   $('#episode-tiles').innerHTML = tiles.map(([k, f, show]) => {
     const val = f(v), usual = avg(f);
@@ -1129,7 +1323,7 @@ async function episodePage(token) {
       const d = 100 * (val - usual) / usual;
       cmp = Math.abs(d) < 5 ? 'about usual' : `${d > 0 ? '+' : '−'}${Math.abs(d).toFixed(0)}% vs usual`;
     }
-    return `<div class="tile"><div class="v">${esc(val == null ? '—' : show(val))}</div><div class="k">${esc(k)}</div>${cmp ? `<div class="cmp small muted" title="${esc(h.short)}’s average this season: ${esc(usual == null ? '—' : show(usual))}">${esc(cmp)}</div>` : ''}</div>`;
+    return tileHTML(k, val == null ? '—' : show(val), cmp ? `<div class="cmp small muted" title="${esc(h.short)}’s average this season: ${esc(usual == null ? '—' : show(usual))}">${esc(cmp)}</div>` : '');
   }).join('');
 
   card(el, { title: 'Who’s named, and when', wide: true, sub: 'Each dot is a time another Hermit is named · click one to watch from there',
@@ -1197,7 +1391,7 @@ async function episodePage(token) {
         li.append(a, ' ', text);
         ul.appendChild(li);
       }
-      return { node: ul };
+      return { node: pageList(ul, 60) };
     } });
 }
 
@@ -1217,7 +1411,7 @@ TABS.status = async function (token) {
     if (run.bot_check) problems.push('YouTube bot-checked the last sync, so it stopped early');
     if (run.failed) problems.push(`${run.failed} video${run.failed === 1 ? '' : 's'} failed in the last sync`);
   }
-  $('#status-head').innerHTML = `<div class="health ${problems.length ? 'warn' : 'ok'}" role="status"><b>${problems.length ? 'Needs a look' : 'All good'}</b>
+  $('#status-head').innerHTML = `<a class="back" href="#tab=overview">← Back to the stats</a><div class="health ${problems.length ? 'warn' : 'ok'}" role="status"><b>${problems.length ? 'Needs a look' : 'All good'}</b>
     <span>${problems.length ? esc(problems.join('; ')) + '.' : 'Built and synced in the last day, nothing failed.'}</span></div>`;
 
   const why = {};
@@ -1229,7 +1423,7 @@ TABS.status = async function (token) {
     ['Via Whisper last sync', run ? full(run.whispered) : '—'], ['Waiting for a transcript', full(st.waiting.length)],
     ['Waiting for Whisper', full(why['Waiting for Whisper'] || 0)], ['Episodes in the stats', full(sum(Object.values(st.counts).flatMap(Object.values), c => sum(Object.values(c), n => n)))],
   ];
-  $('#status-tiles').innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="v">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
+  $('#status-tiles').innerHTML = tiles.map(([k, v]) => `<div class="tile"><div class="v${/ago|now| of /.test(v) ? ' text' : ''}">${esc(v)}</div><div class="k">${esc(k)}</div></div>`).join('');
 
   card(el, { title: 'Why videos are waiting', sub: 'Videos found in a season playlist that have no transcript yet',
     build: () => st.waiting.length ? hbar(Object.entries(why).map(([n, value]) => ({ name: n, value })), { unit: 'videos', onSlug: false, labelWidth: 220 })
@@ -1381,7 +1575,7 @@ async function boot() {
     state.sel = state.sel.filter(s => present().includes(s));
     update();
   };
-  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; state.ep = null; if (scrollY > $('#bar-anchor').offsetTop) scrollTo({ top: 0 }); update(); };
+  for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { state.tab = b.dataset.tab; state.ep = null; update(); };
   $('#search-form').onsubmit = e => { e.preventDefault(); state.search = $('#search-input').value.trim(); update(); };
   $('#theme').onclick = () => {
     const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1398,16 +1592,33 @@ async function boot() {
     if (state.ep !== was[0] || state.tab !== was[1]) scrollTo({ top: 0 });
     update();
   });
-  let rt;
-  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => charts.forEach(c => c.resize()), 120); });
-  // Once scrolled into the charts, fold the filters into one line so the tabs stay in reach.
+  let rt, wasNarrow = narrow();
+  addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      chipRows(false);
+      if (narrow() !== wasNarrow) { wasNarrow = narrow(); update(); }     // some cards have a phone layout
+      else charts.forEach(c => c.resize());
+    }, 120);
+  });
+  for (const box of document.querySelectorAll('#bar .chips')) box.addEventListener('scroll', () => chipRows(false), { passive: true });
+  // Table headers stick just under the filter bar, whatever its height.
+  new ResizeObserver(() => document.documentElement.style.setProperty('--bar-h', $('#bar').offsetHeight + 'px')).observe($('#bar'));
+  // Once scrolled into the charts, compact the filters so they and the tabs stay in reach without taking the screen.
   // Different thresholds for folding and unfolding, so the bar's change in height can't make it flicker.
   const bar = $('#bar');
   addEventListener('scroll', () => {
     const y = scrollY, top = $('#bar-anchor').offsetTop;
+    const was = bar.classList.contains('compact');
     if (y > top + 160) bar.classList.add('compact'); else if (y < top + 8) bar.classList.remove('compact');
+    if (bar.classList.contains('compact') !== was) chipRows();
   }, { passive: true });
-  $('#sel-edit').onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
+  for (const box of [$('#tiles'), $('#episode-tiles')]) box.addEventListener('click', e => {
+    const b = e.target.closest('.tile-share');
+    if (b) { e.stopPropagation(); openShare(b, tileOpts(b.closest('.tile'))); }
+  });
+  addEventListener('click', e => { if (!e.target.closest('.share-menu')) closeShare(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeShare(); });
   for (const b of document.querySelectorAll('.examples button')) b.onclick = () => { state.search = b.textContent; update(); };
   update();
 }
