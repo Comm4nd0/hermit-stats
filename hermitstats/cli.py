@@ -147,6 +147,7 @@ def cmd_sync(args) -> int:
     season = {}
     for vid, coll in conn.execute("SELECT video_id, collection FROM collection_videos"):
         season[vid] = min(season.get(vid, len(rank)), rank.get(coll, len(rank)))
+    todo = [r for r in todo if season.get(r["id"], len(rank)) < len(rank)]    # skip seasons no longer configured
     todo.sort(key=lambda r: (db.has_transcript(conn, r["id"]), season.get(r["id"], len(rank))))
     if args.limit:
         todo = todo[:args.limit]
