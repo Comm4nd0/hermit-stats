@@ -22,8 +22,9 @@
 #                 them there). `skip` only applies to playlist titles and title matches: a season playlist's own
 #                 episodes stay even when they say "live" ("I Live in Half of a House!").
 # paused          true: the collection is kept here but not searched, transcribed or shown.
-# streams         stream recordings are left out of every collection too: anything on the channel's Live tab, and
-#                 videos of an hour or more whose title matches this (older VODs were uploaded as normal videos).
+# streams         stream recordings and Shorts are left out of every collection too: anything on the channel's
+#                 Live or Shorts tab, and videos of an hour or more whose title matches this (older VODs were
+#                 uploaded as normal videos).
 
 # Channels that reupload old episodes: a video from one of these, found in a hermit's playlist,
 # still counts as that hermit's.

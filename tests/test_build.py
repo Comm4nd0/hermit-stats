@@ -436,7 +436,8 @@ def test_streams_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch):
          ("HermitCraft 5 StreamCast | FOR THE HORDE! | #1", 29 * 60), ("I Live in Half of a House! :: Hermitcraft 7", 20 * 60),
          ("Hermitcraft 7: Concrete Marathon", 180 * 60), ("Hermitcraft 7: Tree farm", 25 * 60))])
     monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
-    monkeypatch.setattr(youtube, "live_ids", lambda *a, **k: {"Hermitcraft 7: Concrete Marathon", "old-vod"})
+    # On the channel's Live or Shorts tab.
+    monkeypatch.setattr(youtube, "not_episode_ids", lambda *a, **k: {"Hermitcraft 7: Concrete Marathon", "old-vod"})
     cfg = config.load(Path(__file__).parent.parent / "hermits.toml")
     xb = cfg.hermit("xBCrafted")
     cfg.collections = [cfg.collection("Season 7")]

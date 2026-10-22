@@ -50,8 +50,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
     found = 0
     uploads = recent = None
     today = time.strftime("%Y%m%d")
-    # Stream recordings aren't episodes, even filed in a season playlist.
-    live = youtube.live_ids(hermit.url, cookies)
+    # Stream recordings and Shorts aren't episodes, even filed in a season playlist.
+    live = youtube.not_episode_ids(hermit.url, cookies)
     for coll in cfg.collections:
         if not coll.includes(hermit):
             continue
@@ -67,7 +67,7 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             db.upsert_playlist(conn, pid, info["id"], title, coll.name)
             for v in listed:
                 if coll.side(v["title"]) or v["id"] in live or coll.stream(v["title"], v.get("duration")):
-                    continue                  # a Hermit's UHC, modded episodes or streams filed in their season playlist
+                    continue                  # a Hermit's UHC, modded episodes, streams or Shorts filed in their season playlist
                 db.upsert_video(conn, info["id"], v)
                 db.add_to_collection(conn, coll.name, v["id"], f"playlist:{pid}")
                 ids.add(v["id"])
@@ -92,7 +92,7 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             if picked and candidates is uploads:
                 db.set_kv(conn, swept, today)
             conn.commit()
-        # A stream, compilation or side series matched before `skip` / `side_series` / `streams` knew better.
+        # A stream, Short, compilation or side series matched before `skip` / `side_series` / `streams` knew better.
         for vid, title, duration, via in conn.execute(
                 """SELECT v.id, v.title, v.duration, cv.via FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
                    WHERE cv.collection = ? AND v.channel = ?""", (coll.name, info["id"])).fetchall():
