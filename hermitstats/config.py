@@ -97,6 +97,7 @@ class Config:
 
 def load(path: Path) -> Config:
     raw = tomllib.loads(path.read_text())
+    raw["collection"] = [c for c in raw.get("collection", []) if not c.get("paused")]   # kept for later, not searched
     collections = [
         Collection(c["name"], re.compile(c["playlist"], re.I),
                    re.compile(c["video_title"], re.I) if c.get("video_title") else None,

@@ -407,7 +407,7 @@ def test_side_series_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch)
     from hermitstats import cli, config, youtube
     conn = db.connect(tmp_path / "t.db")
     monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
-        "id": "UCi", "name": "Iskall", "avatar_url": None, "playlists": [("PL4", "HermitCraft 4")]})
+        "id": "UCi", "name": "Iskall", "avatar_url": None, "playlists": [("PL9", "HermitCraft 9")]})
     monkeypatch.setattr(youtube, "list_playlist", lambda *a, **k: [
         {"id": t, "title": t, "upload_date": None} for t in
         ("HermitCraft 4 | 12 | Tree farm", "HermitCraft UHC X: - 1 - Lost in Swamps", "Hunt The Hermit - #1 - [HermitCraft Special UHC]",
@@ -415,7 +415,7 @@ def test_side_series_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch)
     monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
     cfg = config.load(Path(__file__).parent.parent / "hermits.toml")
     iskall = cfg.hermit("Iskall85")
-    cfg.collections = [cfg.collection("Season 4")]
+    cfg.collections = [cfg.collection("Season 9")]
     cfg.collections[0].members = [iskall.slug]
     cli._discover(conn, cfg, iskall, None)
     assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == [
@@ -462,3 +462,11 @@ def test_long_audio_is_transcribed_in_pieces():
     assert calls == [(160000, None), (160000, "en"), (80000, "en")]
     assert [s["start"] for s in segs] == [1.0, 11.0, 21.0]
     assert info.language == "en"
+
+
+def test_paused_seasons_are_not_loaded_and_their_hermits_not_searched(tmp_path, monkeypatch):
+    from hermitstats import cli, config, youtube
+    cfg = config.load(Path(__file__).parent.parent / "hermits.toml")
+    assert "Season 1" not in [c.name for c in cfg.collections] and "Season 7" in [c.name for c in cfg.collections]
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: pytest.fail("searched"))
+    assert cli._discover(db.connect(tmp_path / "t.db"), cfg, cfg.hermit("Generikb"), None) == 0

@@ -42,6 +42,8 @@ RECENT_UPLOADS = 30
 def _discover(conn, cfg, hermit, cookies) -> int:
     """Find the hermit's collection videos (playlists first, title match as fallback). Returns how many.
     Commits after each batch of writes, never across a YouTube request, so a build can run meanwhile."""
+    if not any(coll.includes(hermit) for coll in cfg.collections):    # only in paused seasons
+        return 0
     info = youtube.channel_playlists(hermit.url, cookies)
     db.upsert_channel(conn, info["id"], hermit.slug, info["name"], hermit.url, info["avatar_url"])
     conn.commit()

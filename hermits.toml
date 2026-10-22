@@ -21,6 +21,7 @@
 #                 Their videos are left out of every collection, even from a season playlist (some Hermits filed
 #                 them there). `skip` only applies to playlist titles and title matches: a season playlist's own
 #                 episodes stay even when they say "live" ("I Live in Half of a House!").
+# paused          true: the collection is kept here but not searched, transcribed or shown.
 # streams         stream recordings are left out of every collection too: anything on the channel's Live tab, and
 #                 videos of an hour or more whose title matches this (older VODs were uploaded as normal videos).
 
@@ -109,6 +110,7 @@ members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymm
 # Opened 19 Jul 2018. xBCrafted only streamed. Hypnotizd and VintageBeef were whitelisted but never joined: left out.
 [[collection]]
 name = "Season 6"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(6|vi)\b'
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(6|vi)\b'
@@ -123,6 +125,7 @@ members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "FalseSymmetry", "
 # Opened 13 Apr 2017. Hypnotizd, Jessassin and Keralis were whitelisted but never appeared: left out.
 [[collection]]
 name = "Season 5"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(5|v)\b'
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(5|v)\b'
@@ -138,6 +141,7 @@ members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymm
 # Keralis was whitelisted but never appeared: left out.
 [[collection]]
 name = "Season 4"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(4|iv)\b'
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(4|iv)\b'
@@ -153,6 +157,7 @@ members = ["Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GoodTim
 # Red3yz as leaving this season (whitelisted, no Season 3 episodes). Jessassin was whitelisted but never appeared: left out.
 [[collection]]
 name = "Season 3"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(3|iii)\b|hermit\s*craft[\s:|!~\[\(\-]*(?:vanilla[\s:|!~\[\(\-]*)?amplified'
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(3|iii)\b|hermit\s*craft[\s:|!~\[\(\-]*(?:vanilla[\s:|!~\[\(\-]*)?amplified'
@@ -167,6 +172,7 @@ members = ["Biffa2001", "Docm77", "Etho", "FalseSymmetry", "Hypnotizd", "IAmSp00
 # Opened 9 Jun 2013 ("HermitCraft 2.0"). Dewtroid and VenomKisser joined but only streamed; CilantroGamer only streamed.
 [[collection]]
 name = "Season 2"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(2|ii)\b'
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(2|ii)\b'
@@ -193,6 +199,7 @@ members = ["Aureylian", "Biffa2001", "CilantroGamer", "Dewtroid", "FalseSymmetry
 # Brenybeast and Sokar joined but never posted. Cameos (SethBling, BlockFortress, Toby, Invis...) left out.
 [[collection]]
 name = "Season 1"
+paused = true
 series = "Hermitcraft"
 playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(1)\b|^\W*(?:minecraft\W*|the\s+|\w+:\s*)?hermit\s*craft(?:\W*(?:server|vanilla|smp|survival|the\s+original\s+series|with\s+joe\s+hills|red3yz))*\W*$'
 video_title = 'hermit\s*craft(?![\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:2\.0|ii\b|seasons?\s*2\b|series\s*2\b|s2\b))'
