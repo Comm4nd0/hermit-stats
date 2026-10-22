@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 import json
 import sqlite3
 from collections import Counter
@@ -383,3 +384,22 @@ def test_a_video_from_outside_its_seasons_is_not_transcribed(monkeypatch):
     s1 = Collection("Season 1", re.compile("x"), None, None, "20120408", "20130707")
     args = SimpleNamespace(pause=(0, 0), cookies=None, cookies_from_browser=None, whisper="fallback", lang="en")
     assert cli._fetch("v", True, [s1], args)[3] is False
+
+
+def test_side_series_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch):
+    from hermitstats import cli, config, youtube
+    conn = db.connect(tmp_path / "t.db")
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
+        "id": "UCi", "name": "Iskall", "avatar_url": None, "playlists": [("PL4", "HermitCraft 4")]})
+    monkeypatch.setattr(youtube, "list_playlist", lambda *a, **k: [
+        {"id": t, "title": t, "upload_date": None} for t in
+        ("HermitCraft 4 | 12 | Tree farm", "HermitCraft UHC X: - 1 - Lost in Swamps", "Hunt The Hermit - #1 - [HermitCraft Special UHC]",
+         "Hermitcraft 5 - Ep. 103: Thoughts On Hermit Quest S2", "Hermitcraft 6: LIVE BIG DIG!")])
+    monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
+    cfg = config.load(Path(__file__).parent.parent / "hermits.toml")
+    iskall = cfg.hermit("Iskall85")
+    cfg.collections = [cfg.collection("Season 4")]
+    cfg.collections[0].members = [iskall.slug]
+    cli._discover(conn, cfg, iskall, None)
+    assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == [
+        "HermitCraft 4 | 12 | Tree farm", "Hermitcraft 5 - Ep. 103: Thoughts On Hermit Quest S2", "Hermitcraft 6: LIVE BIG DIG!"]

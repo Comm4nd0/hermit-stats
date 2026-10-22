@@ -17,17 +17,21 @@ class Collection:
     series: str = "Hermitcraft"
     teams: dict[str, list[str]] = field(default_factory=dict)   # team name -> member slugs
     members: list[str] = field(default_factory=list)            # slugs; empty = every Hermit not `only_listed`
+    side_series: re.Pattern | None = None   # modded / minigame series: never in the collection, whatever the playlist
 
     @property
     def slug(self) -> str:
         return re.sub(r"[^a-z0-9]+", "-", self.name.lower()).strip("-")
 
     def wants(self, title: str, upload_date: str | None = None) -> bool:
-        if self.skip and self.skip.search(title or ""):
+        if self.skip and self.skip.search(title or "") or self.side(title):
             return False
         if not upload_date:
             return True
         return not (self.starts and upload_date < self.starts) and not (self.ends and upload_date > self.ends)
+
+    def side(self, title: str | None) -> bool:
+        return bool(self.side_series and self.side_series.search(title or ""))
 
     def includes(self, hermit: "Hermit") -> bool:
         """Whether the hermit's channel is searched for this collection's videos."""
@@ -99,7 +103,9 @@ def load(path: Path) -> Config:
     deploy = raw.get("deploy", {})
     cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"),
                  [a.lower().lstrip("@") for a in raw.get("archive_channels", [])])
+    side = re.compile(raw["side_series"], re.I) if raw.get("side_series") else None
     for c, rc in zip(collections, raw.get("collection", [])):
+        c.side_series = side
         c.teams = {team: [cfg.hermit(m).slug for m in members] for team, members in rc.get("teams", {}).items()}
         c.members = [cfg.hermit(m).slug for m in rc.get("members", [])]
     for h in hermits:

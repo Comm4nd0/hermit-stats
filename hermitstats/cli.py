@@ -62,6 +62,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             listed = youtube.list_playlist(pid, cookies)
             db.upsert_playlist(conn, pid, info["id"], title, coll.name)
             for v in listed:
+                if coll.side(v["title"]):      # a Hermit's UHC or modded episodes filed in their season playlist
+                    continue
                 db.upsert_video(conn, info["id"], v)
                 db.add_to_collection(conn, coll.name, v["id"], f"playlist:{pid}")
                 ids.add(v["id"])
@@ -85,13 +87,15 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                     ids.add(v["id"])
             if picked and candidates is uploads:
                 db.set_kv(conn, swept, today)
-            for vid, title in conn.execute(
-                    """SELECT v.id, v.title FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
-                       WHERE cv.collection = ? AND cv.via = 'title' AND v.channel = ?""", (coll.name, info["id"])).fetchall():
-                if not coll.wants(title):     # a stream or compilation matched before `skip` knew better
-                    db.remove_from_collection(conn, coll.name, vid)
-                    ids.discard(vid)
             conn.commit()
+        # A stream, compilation or side series matched before `skip` / `side_series` knew better.
+        for vid, title, via in conn.execute(
+                """SELECT v.id, v.title, cv.via FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
+                   WHERE cv.collection = ? AND v.channel = ?""", (coll.name, info["id"])).fetchall():
+            if coll.side(title) or via == "title" and not coll.wants(title):
+                db.remove_from_collection(conn, coll.name, vid)
+                ids.discard(vid)
+        conn.commit()
         how = (f"{len(picked)} playlist{'s' * (len(picked) != 1)}" if picked
                else "title match" if coll.video_title else "nothing to match")
         extra = f" (+{len(ids) - in_playlists} not in a playlist)" if len(ids) > in_playlists and picked else ""
