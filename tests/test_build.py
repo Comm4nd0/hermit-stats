@@ -316,9 +316,26 @@ def test_update_runs_build_on_every_season(monkeypatch):
     from hermitstats import cli
     ran = []
     for name in ("cmd_sync", "cmd_build", "cmd_push"):
-        monkeypatch.setattr(cli, name, lambda args, name=name: ran.append((name, args.season)) or 0)
+        monkeypatch.setattr(cli, name, lambda args, name=name: ran.append((name, args.season, args.hours)) or 0)
     assert cli.main(["update"]) == 0
-    assert ran == [("cmd_sync", None), ("cmd_build", None), ("cmd_push", None)]
+    assert ran == [("cmd_sync", None, 6), ("cmd_build", None, 6), ("cmd_push", None, 6)]   # 6 h, then build and push
+    ran.clear()
+    assert cli.main(["update", "--hours", "2"]) == 0 and ran[0] == ("cmd_sync", None, 2)
+
+
+def test_sync_stops_when_its_hours_are_up_so_the_site_still_gets_built(tmp_path, monkeypatch):
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_channel(conn, "UCg", "grian", "Grian", "@Grian", None)
+    for i in range(3):
+        db.upsert_video(conn, "UCg", {"id": f"v{i}", "title": f"Hermitcraft 11: Episode {i}", "upload_date": "20260101"})
+        db.add_to_collection(conn, "Season 11", f"v{i}", "title")
+    conn.commit()
+    monkeypatch.setattr(youtube, "fetch_details", lambda vid, cookies: pytest.fail("still fetching"))
+    toml = Path(__file__).parent.parent / "hermits.toml"
+    assert cli.main(["--db", str(tmp_path / "t.db"), "--config", str(toml), "sync", "--no-discover",
+                     "--no-refresh", "--whisper", "never", "--hours", "1e-9"]) == 0
+    assert not db.has_transcript(conn, "v0")
 
 
 def test_an_ended_season_is_swept_once_for_episodes_left_out_of_the_playlist(tmp_path, monkeypatch):

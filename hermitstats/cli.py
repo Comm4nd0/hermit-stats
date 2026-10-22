@@ -198,6 +198,13 @@ def cmd_sync(args) -> int:
         futures = {pool.submit(_fetch, r["id"], need and not db.has_transcript(conn, r["id"]), colls_of.get(r["id"]), args): (r, need)
                    for r, need in work}
         for fut in as_completed(futures):
+            if args.hours and time.time() > started + args.hours * 3600:
+                for f in futures:
+                    f.cancel()
+                run["out_of_time"] = True
+                progress.console.print(f"\n[yellow]{args.hours:g} h is up:[/] stopping here so the site gets built; "
+                                       "the next run carries on.")
+                break
             r, need = futures[fut]
             progress.update(task, description=f"[dim]{(r['title'] or r['id'])[:50]}")
             try:
@@ -381,6 +388,8 @@ def main(argv=None) -> int:
         s.add_argument("--no-refresh", action="store_true", help="don't refresh recent videos' view counts")
         s.add_argument("--refresh-all", action="store_true", help="refresh metadata of every video")
         s.add_argument("--limit", type=int, help="transcribe at most N videos this run")
+        s.add_argument("--hours", type=float, metavar="H",
+                       help="stop starting new videos after H hours (update: 6, so a long backfill still publishes)")
         s.add_argument("--workers", type=int, default=2, help="parallel metadata/caption fetches (default 2)")
         s.add_argument("--pause", type=float, nargs=2, default=(1.0, 3.0), metavar=("MIN", "MAX"),
                        help="random pause in seconds before each video fetch (default 1 3)")
@@ -420,7 +429,7 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("update", help="sync, build and push in one go")
     sync_args(s)
-    s.set_defaults(fn=cmd_update, season=None)    # build every season
+    s.set_defaults(fn=cmd_update, season=None, hours=6)    # build every season; leave time to build and push
 
     s = sub.add_parser("status", help="videos and transcripts per Hermit")
     s.set_defaults(fn=cmd_status)
