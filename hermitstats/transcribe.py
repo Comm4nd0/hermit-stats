@@ -82,6 +82,9 @@ def _preload_cuda_libs() -> None:
         libs = failed
 
 
+CHUNK_S = 20 * 60
+
+
 def _decode_audio(path: Path, sr: int = 16000):
     """Decode to 16 kHz mono float32 with ffmpeg (sidesteps PyAV version breakage)."""
     import numpy as np
@@ -137,9 +140,17 @@ class Whisper:
         self._model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
 
     @staticmethod
-    def _run(model, audio, lang=None):
-        segs, info = model.transcribe(audio, language=lang, vad_filter=True)
-        return [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segs], info
+    def _run(model, audio, lang=None, chunk_s=CHUNK_S):
+        # Whisper's features for a whole 2 h stream don't fit in 5 GB, so long audio goes in pieces.
+        step = 16000 * chunk_s
+        out, info = [], None
+        for i in range(0, max(len(audio), 1), step):
+            segs, part = model.transcribe(audio[i:i + step], language=lang, vad_filter=True)
+            off = i / 16000
+            out += [{"start": s.start + off, "end": s.end + off, "text": s.text.strip()} for s in segs]
+            info = info or part
+            lang = lang or part.language
+        return out, info
 
     def download_audio(self, video_id: str, cookies: Cookies | None = None) -> Path:
         self.audio_dir.mkdir(parents=True, exist_ok=True)

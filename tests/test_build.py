@@ -403,3 +403,22 @@ def test_side_series_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch)
     cli._discover(conn, cfg, iskall, None)
     assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == [
         "HermitCraft 4 | 12 | Tree farm", "Hermitcraft 5 - Ep. 103: Thoughts On Hermit Quest S2", "Hermitcraft 6: LIVE BIG DIG!"]
+
+
+def test_long_audio_is_transcribed_in_pieces():
+    # A 2 h stream in one go needs more memory than the box has.
+    import numpy as np
+    from types import SimpleNamespace
+    from hermitstats.transcribe import Whisper
+
+    calls = []
+
+    class Model:
+        def transcribe(self, audio, language=None, vad_filter=True):
+            calls.append((len(audio), language))
+            return [SimpleNamespace(start=1.0, end=2.0, text=" hi ")], SimpleNamespace(language="en")
+
+    segs, info = Whisper._run(Model(), np.zeros(16000 * 25), chunk_s=10)
+    assert calls == [(160000, None), (160000, "en"), (80000, "en")]
+    assert [s["start"] for s in segs] == [1.0, 11.0, 21.0]
+    assert info.language == "en"
