@@ -59,13 +59,13 @@ name = "Season 10"
 playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 skip = 'stream|shorts|\blive\b|\bvod\b|empires|seed.*speed\s*run|speed\s*run.*seed|nutshell|memory\s*lane|best\s*bits|\bbest\s+of\b|coffee|moby\s*dick|good\s*morning'
-starts = "2023-03-01"
+starts = "2024-02-03"
 ends = "2025-12-01"
 members = ["BdoubleO100", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GeminiTay", "Grian", "Hypnotizd", "iJevin", "impulseSV", "Joe Hills", "Keralis", "Mumbo Jumbo", "PearlescentMoon", "Rendog", "GoodTimesWithScar", "SmallishBeans", "Skizzleman", "Tango Tek", "VintageBeef", "Welsknight", "xBCrafted", "Xisumavoid", "Zedaph", "ZombieCleo", "Iskall85", "Stressmonster101"]
 
 # ---------------------------------------------------------------- Hermitcraft Seasons 1-9
 
-# Opened 5 Mar 2022. TinfoilChef died on 13 Aug 2022, mid-season. Empires/event cameos left out.
+# Opened 5 Mar 2022; Joe's finale was the last episode, 2 Feb 2024. TinfoilChef died on 13 Aug 2022, mid-season. Empires/event cameos left out.
 [[collection]]
 name = "Season 9"
 series = "Hermitcraft"
@@ -73,7 +73,7 @@ playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*l
 video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(9|ix)\b'
 skip = 'stream|shorts|\blive\b|\bvod\b|empires|seed.*speed\s*run|speed\s*run.*seed|nutshell|memory\s*lane|best\s*bits|\bbest\s+of\b|coffee|moby\s*dick|good\s*morning'
 starts = "2022-03-01"
-ends = "2023-04-05"
+ends = "2024-02-02"
 members = ["BdoubleO100", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GeminiTay", "GoodTimesWithScar", "Grian",
            "Hypnotizd", "iJevin", "impulseSV", "Iskall85", "Joe Hills", "Keralis", "Mumbo Jumbo", "PearlescentMoon",
            "Rendog", "Stressmonster101", "Tango Tek", "TinfoilChef", "VintageBeef", "Welsknight", "xBCrafted",
