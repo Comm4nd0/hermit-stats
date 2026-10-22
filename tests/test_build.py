@@ -471,3 +471,24 @@ def test_paused_seasons_are_not_loaded_and_their_hermits_not_searched(tmp_path, 
     assert "Season 1" not in [c.name for c in cfg.collections] and "Season 7" in [c.name for c in cfg.collections]
     monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: pytest.fail("searched"))
     assert cli._discover(db.connect(tmp_path / "t.db"), cfg, cfg.hermit("Generikb"), None) == 0
+
+
+def test_someone_elses_video_in_a_hermits_playlist_is_not_theirs(tmp_path, monkeypatch):
+    # iJevin saved Porch Archive's Short to his Hermitcraft 11 playlist; an Archive reupload still counts.
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_video(conn, "UCj", {"id": "porch", "title": "This Cop Did The Impossible", "upload_date": None})
+    db.add_to_collection(conn, "Season 11", "porch", "playlist:PL11")      # credited to Jevin before the check
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
+        "id": "UCj", "name": "iJevin", "avatar_url": None, "playlists": [("PL11", "Hermitcraft 11")]})
+    monkeypatch.setattr(youtube, "list_playlist", lambda *a, **k: [
+        {"id": "ep", "title": "Hermitcraft 11 Ep 1", "upload_date": None, "channel_id": "UCj", "uploader_id": "@iJevin"},
+        {"id": "porch", "title": "This Cop Did The Impossible", "upload_date": None, "channel_id": "UCp", "uploader_id": "@PorchArchlve"},
+        {"id": "arch", "title": "Hermitcraft 11 Ep 2", "upload_date": None, "channel_id": "UCa", "uploader_id": "@TheHermitcraftArchive"},
+        {"id": "old", "title": "Hermitcraft 11 Ep 3", "upload_date": None}])
+    monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
+    pattern = re.compile(r"hermitcraft\s*11", re.I)
+    jevin = Hermit("iJevin", "@iJevin", ["jevin"])
+    cfg = Config([Collection("Season 11", pattern, None)], [jevin], None, None, ["thehermitcraftarchive"])
+    cli._discover(conn, cfg, jevin, None)
+    assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == ["arch", "ep", "old"]

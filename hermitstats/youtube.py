@@ -41,6 +41,8 @@ def _flat_entry(e: dict) -> dict:
         "duration": e.get("duration"),
         "view_count": e.get("view_count"),
         "url": f"https://www.youtube.com/watch?v={e['id']}",
+        "channel_id": e.get("channel_id"),
+        "uploader_id": e.get("uploader_id"),
     }
 
 

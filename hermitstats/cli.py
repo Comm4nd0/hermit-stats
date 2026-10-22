@@ -61,13 +61,16 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             pid = youtube_playlist_id(manual)
             if pid not in {p for p, _ in picked}:
                 picked.append((pid, coll.name))
-        ids = set()
+        ids, foreign = set(), set()
         for pid, title in picked:
             listed = youtube.list_playlist(pid, cookies)
             db.upsert_playlist(conn, pid, info["id"], title, coll.name)
             for v in listed:
                 if coll.side(v["title"]) or v["id"] in live or coll.stream(v["title"], v.get("duration")):
                     continue                  # a Hermit's UHC, modded episodes, streams or Shorts filed in their season playlist
+                if not _theirs(v, info["id"], cfg):
+                    foreign.add(v["id"])      # someone else's video saved to the Hermit's playlist
+                    continue
                 db.upsert_video(conn, info["id"], v)
                 db.add_to_collection(conn, coll.name, v["id"], f"playlist:{pid}")
                 ids.add(v["id"])
@@ -92,11 +95,13 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             if picked and candidates is uploads:
                 db.set_kv(conn, swept, today)
             conn.commit()
-        # A stream, Short, compilation or side series matched before `skip` / `side_series` / `streams` knew better.
+        # A stream, Short, compilation, side series or someone else's video (credited to the Hermit before uploaders
+        # were checked) matched before `skip` / `side_series` / `streams` knew better.
         for vid, title, duration, via in conn.execute(
                 """SELECT v.id, v.title, v.duration, cv.via FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
                    WHERE cv.collection = ? AND v.channel = ?""", (coll.name, info["id"])).fetchall():
-            if coll.side(title) or vid in live or coll.stream(title, duration) or via == "title" and not coll.wants(title):
+            if coll.side(title) or vid in live or vid in foreign or coll.stream(title, duration) \
+                    or via == "title" and not coll.wants(title):
                 db.remove_from_collection(conn, coll.name, vid)
                 ids.discard(vid)
         conn.commit()
@@ -106,6 +111,13 @@ def _discover(conn, cfg, hermit, cookies) -> int:
         console.print(f"  {hermit.name:<20} {coll.name}: [bold]{len(ids)}[/] videos via {how}{extra}")
         found += len(ids)
     return found
+
+
+def _theirs(v: dict, channel: str, cfg) -> bool:
+    """A playlist entry the Hermit uploaded, or an Archive reupload of their episode (which counts as theirs)."""
+    if not v.get("channel_id") or v["channel_id"] == channel:
+        return True
+    return (v.get("uploader_id") or "").lower().lstrip("@") in cfg.archive_channels
 
 
 def youtube_playlist_id(s: str) -> str:
