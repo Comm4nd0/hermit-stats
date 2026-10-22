@@ -243,6 +243,7 @@ body.page-status .filters { display: none; }
 .hovercard b { font-size: 14px; }
 
 footer { max-width: 1440px; margin: 0 auto; padding: 0 24px 32px; }
+footer .kofi { margin-top: 12px; }
 
 @media (max-width: 640px) {
   .top, .filters, .tabs, main, footer { padding-left: 16px; padding-right: 16px; }
