@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+STREAM_MIN_S = 60 * 60
+
+
 @dataclass
 class Collection:
     name: str
@@ -18,6 +21,7 @@ class Collection:
     teams: dict[str, list[str]] = field(default_factory=dict)   # team name -> member slugs
     members: list[str] = field(default_factory=list)            # slugs; empty = every Hermit not `only_listed`
     side_series: re.Pattern | None = None   # modded / minigame series: never in the collection, whatever the playlist
+    streams: re.Pattern | None = None       # a title saying it's a stream, on an hour-plus video: a stream recording
 
     @property
     def slug(self) -> str:
@@ -32,6 +36,12 @@ class Collection:
 
     def side(self, title: str | None) -> bool:
         return bool(self.side_series and self.side_series.search(title or ""))
+
+    def stream(self, title: str | None, duration: float | None) -> bool:
+        """A stream recording, going by its title and length; "StreamCast #3" and stream highlights are episodes.
+        Streams on a channel's Live tab are caught by that instead."""
+        return bool(self.streams and duration is not None and (duration == 0 or duration >= STREAM_MIN_S)
+                    and self.streams.search(title or ""))
 
     def includes(self, hermit: "Hermit") -> bool:
         """Whether the hermit's channel is searched for this collection's videos."""
@@ -104,8 +114,10 @@ def load(path: Path) -> Config:
     cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"),
                  [a.lower().lstrip("@") for a in raw.get("archive_channels", [])])
     side = re.compile(raw["side_series"], re.I) if raw.get("side_series") else None
+    streams = re.compile(raw["streams"], re.I) if raw.get("streams") else None
     for c, rc in zip(collections, raw.get("collection", [])):
         c.side_series = side
+        c.streams = streams
         c.teams = {team: [cfg.hermit(m).slug for m in members] for team, members in rc.get("teams", {}).items()}
         c.members = [cfg.hermit(m).slug for m in rc.get("members", [])]
     for h in hermits:

@@ -104,6 +104,11 @@ def list_uploads(channel_url: str, tabs=("videos", "streams"), latest: int | Non
     return list(out.values())
 
 
+def live_ids(channel_url: str, cookies: Cookies | None = None) -> set[str]:
+    """Every past stream on the channel's Live tab."""
+    return {v["id"] for v in list_uploads(channel_url, tabs=("streams",), cookies=cookies)}
+
+
 def fetch_details(video_id: str, cookies: Cookies | None = None) -> tuple[dict, dict]:
     """Full metadata for one video. Returns (row for the db, raw yt-dlp info) — the raw info carries
     the caption track URLs, so the caller reuses it for the transcript."""

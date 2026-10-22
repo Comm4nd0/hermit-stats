@@ -405,6 +405,29 @@ def test_side_series_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch)
         "HermitCraft 4 | 12 | Tree farm", "Hermitcraft 5 - Ep. 103: Thoughts On Hermit Quest S2", "Hermitcraft 6: LIVE BIG DIG!"]
 
 
+
+def test_streams_stay_out_even_from_a_season_playlist(tmp_path, monkeypatch):
+    from hermitstats import cli, config, youtube
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_video(conn, "UCx", {"id": "old-vod", "title": "HermitCraft 7: Ever Given Interior", "upload_date": None})
+    db.add_to_collection(conn, "Season 7", "old-vod", "title")      # found before streams were left out
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
+        "id": "UCx", "name": "xB", "avatar_url": None, "playlists": [("PL7", "Hermitcraft 7")]})
+    monkeypatch.setattr(youtube, "list_playlist", lambda *a, **k: [
+        {"id": t, "title": t, "upload_date": None, "duration": d} for t, d in
+        (("HermitCraft 7 | Full Stream | 3/29/20", 186 * 60), ("Hermitcraft 7: LIVE - END BUSTING", 209 * 60),
+         ("HermitCraft 5 StreamCast | FOR THE HORDE! | #1", 29 * 60), ("I Live in Half of a House! :: Hermitcraft 7", 20 * 60),
+         ("Hermitcraft 7: Concrete Marathon", 180 * 60), ("Hermitcraft 7: Tree farm", 25 * 60))])
+    monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [])
+    monkeypatch.setattr(youtube, "live_ids", lambda *a, **k: {"Hermitcraft 7: Concrete Marathon", "old-vod"})
+    cfg = config.load(Path(__file__).parent.parent / "hermits.toml")
+    xb = cfg.hermit("xBCrafted")
+    cfg.collections = [cfg.collection("Season 7")]
+    cli._discover(conn, cfg, xb, None)
+    assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == [
+        "HermitCraft 5 StreamCast | FOR THE HORDE! | #1", "Hermitcraft 7: Tree farm", "I Live in Half of a House! :: Hermitcraft 7"]
+
+
 def test_long_audio_is_transcribed_in_pieces():
     # A 2 h stream in one go needs more memory than the box has.
     import numpy as np

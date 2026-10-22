@@ -48,6 +48,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
     found = 0
     uploads = recent = None
     today = time.strftime("%Y%m%d")
+    # Stream recordings aren't episodes, even filed in a season playlist.
+    live = youtube.live_ids(hermit.url, cookies)
     for coll in cfg.collections:
         if not coll.includes(hermit):
             continue
@@ -62,8 +64,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             listed = youtube.list_playlist(pid, cookies)
             db.upsert_playlist(conn, pid, info["id"], title, coll.name)
             for v in listed:
-                if coll.side(v["title"]):      # a Hermit's UHC or modded episodes filed in their season playlist
-                    continue
+                if coll.side(v["title"]) or v["id"] in live or coll.stream(v["title"], v.get("duration")):
+                    continue                  # a Hermit's UHC, modded episodes or streams filed in their season playlist
                 db.upsert_video(conn, info["id"], v)
                 db.add_to_collection(conn, coll.name, v["id"], f"playlist:{pid}")
                 ids.add(v["id"])
@@ -80,19 +82,19 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                     uploads = youtube.list_uploads(hermit.url, cookies=cookies)
                 candidates = uploads
             for v in candidates:
-                if v["id"] not in ids and coll.video_title.search(v["title"] or "") \
-                        and coll.wants(v["title"], v["upload_date"]):
+                if v["id"] not in ids and v["id"] not in live and coll.video_title.search(v["title"] or "") \
+                        and coll.wants(v["title"], v["upload_date"]) and not coll.stream(v["title"], v.get("duration")):
                     db.upsert_video(conn, info["id"], v)
                     db.add_to_collection(conn, coll.name, v["id"], "title")
                     ids.add(v["id"])
             if picked and candidates is uploads:
                 db.set_kv(conn, swept, today)
             conn.commit()
-        # A stream, compilation or side series matched before `skip` / `side_series` knew better.
-        for vid, title, via in conn.execute(
-                """SELECT v.id, v.title, cv.via FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
+        # A stream, compilation or side series matched before `skip` / `side_series` / `streams` knew better.
+        for vid, title, duration, via in conn.execute(
+                """SELECT v.id, v.title, v.duration, cv.via FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
                    WHERE cv.collection = ? AND v.channel = ?""", (coll.name, info["id"])).fetchall():
-            if coll.side(title) or via == "title" and not coll.wants(title):
+            if coll.side(title) or vid in live or coll.stream(title, duration) or via == "title" and not coll.wants(title):
                 db.remove_from_collection(conn, coll.name, vid)
                 ids.discard(vid)
         conn.commit()

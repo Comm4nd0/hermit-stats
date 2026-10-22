@@ -20,7 +20,9 @@
 # side_series     modded and minigame series that reuse the Hermitcraft name (FTB, Vault Hunters, UHC, Hermit Quest...).
 #                 Their videos are left out of every collection, even from a season playlist (some Hermits filed
 #                 them there). `skip` only applies to playlist titles and title matches: a season playlist's own
-#                 episodes stay even when recorded live.
+#                 episodes stay even when they say "live" ("I Live in Half of a House!").
+# streams         stream recordings are left out of every collection too: anything on the channel's Live tab, and
+#                 videos of an hour or more whose title matches this (older VODs were uploaded as normal videos).
 
 # Channels that reupload old episodes: a video from one of these, found in a hermit's playlist,
 # still counts as that hermit's.
@@ -29,6 +31,8 @@ archive_channels = ["@TheHermitcraftArchive"]
 # Hermit Quest, Hardcore Hermits, Hunt the Hermit and UHC only when the title is about them: regular episodes mention them
 # ("Thoughts On Hermit Quest S2", "Gold-fever & UHC Talk").
 side_series = '\bftb\b|feed\s*the\s*beast|mod\s*sauce|hermit\s*craft\W*(special\s*)?uhc|^\W*uhc\b|\buhc\s*(s\d|season|#|ep)|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b|vault\s*hunters?|project\s*ozone|hermit\s*craft\W*(monster|unleashed|ultimate|infinity)\b|hermit\s*skies|hermits\s*reloaded|\buhb\b|sky\s*factory|\bstone\s*block|\[[^\]]*\bmod\]|\bmod\s+by\b|^\W*(hermit\s*quest|hardcore\s*hermits|hunt\s*the\s*hermit)'
+
+streams = '\bstream|🔴|\blive\b|\*\*\*\s*(now\s+)?finished'
 
 [deploy]
 target = "luma:/root/caddy/static/hermit-stats/"
