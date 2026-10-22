@@ -34,7 +34,8 @@ def _cfg(args):
 # ---------------------------------------------------------------- sync
 
 # Hermits often add an episode to their season playlist days late, or forget; their newest uploads are also
-# matched by title so those episodes aren't missed.
+# matched by title so those episodes aren't missed. Once a season has ended, all their uploads are matched,
+# once (kv "swept:<channel>:<season>"), for the episodes that never made it into the playlist.
 RECENT_UPLOADS = 30
 
 
@@ -46,6 +47,7 @@ def _discover(conn, cfg, hermit, cookies) -> int:
     conn.commit()
     found = 0
     uploads = recent = None
+    today = time.strftime("%Y%m%d")
     for coll in cfg.collections:
         if not coll.includes(hermit):
             continue
@@ -66,7 +68,8 @@ def _discover(conn, cfg, hermit, cookies) -> int:
             conn.commit()
         in_playlists = len(ids)
         if coll.video_title:
-            if picked:
+            swept = f"swept:{info['id']}:{coll.name}"
+            if picked and not (coll.ends and coll.ends < today and not db.get_kv(conn, swept)):
                 if recent is None:
                     recent = youtube.list_uploads(hermit.url, latest=RECENT_UPLOADS, cookies=cookies)
                 candidates = recent
@@ -80,10 +83,12 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                     db.upsert_video(conn, info["id"], v)
                     db.add_to_collection(conn, coll.name, v["id"], "title")
                     ids.add(v["id"])
+            if picked and candidates is uploads:
+                db.set_kv(conn, swept, today)
             conn.commit()
         how = (f"{len(picked)} playlist{'s' * (len(picked) != 1)}" if picked
                else "title match" if coll.video_title else "nothing to match")
-        extra = f" (+{len(ids) - in_playlists} recent not in a playlist)" if len(ids) > in_playlists and picked else ""
+        extra = f" (+{len(ids) - in_playlists} not in a playlist)" if len(ids) > in_playlists and picked else ""
         console.print(f"  {hermit.name:<20} {coll.name}: [bold]{len(ids)}[/] videos via {how}{extra}")
         found += len(ids)
     return found

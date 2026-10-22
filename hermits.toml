@@ -45,6 +45,7 @@ playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 video_title = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
 skip = 'stream|shorts|\blive\b'
 starts = "2023-03-01"
+ends = "2025-12-01"
 members = ["BdoubleO100", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GeminiTay", "Grian", "Hypnotizd", "iJevin", "impulseSV", "Joe Hills", "Keralis", "Mumbo Jumbo", "PearlescentMoon", "Rendog", "GoodTimesWithScar", "SmallishBeans", "Skizzleman", "Tango Tek", "VintageBeef", "Welsknight", "xBCrafted", "Xisumavoid", "Zedaph", "ZombieCleo", "Iskall85", "Stressmonster101"]
 
 # ---------------------------------------------------------------- Hermitcraft Seasons 1-9

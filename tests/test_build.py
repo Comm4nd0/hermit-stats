@@ -317,3 +317,25 @@ def test_update_runs_build_on_every_season(monkeypatch):
         monkeypatch.setattr(cli, name, lambda args, name=name: ran.append((name, args.season)) or 0)
     assert cli.main(["update"]) == 0
     assert ran == [("cmd_sync", None), ("cmd_build", None), ("cmd_push", None)]
+
+
+def test_an_ended_season_is_swept_once_for_episodes_left_out_of_the_playlist(tmp_path, monkeypatch):
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {
+        "id": "UCb", "name": "Beef", "avatar_url": None, "playlists": [("PL8", "Hermitcraft 8")]})
+    monkeypatch.setattr(youtube, "list_playlist", lambda *a, **k: [{"id": "e1", "title": "Hermitcraft 8 Episode 1", "upload_date": "20210709"}])
+    listed = []
+
+    def uploads(url, latest=None, cookies=None):
+        listed.append(latest)
+        return [{"id": "e12", "title": "Secret Booth! - HERMITCRAFT 8 - Episode 12", "upload_date": "20211020"},
+                {"id": "e1", "title": "Hermitcraft 8 Episode 1", "upload_date": "20210709"}]
+    monkeypatch.setattr(youtube, "list_uploads", uploads)
+    pattern = re.compile(r"hermitcraft\s*8", re.I)
+    beef = Hermit("VintageBeef", "@VintageBeef", ["beef"])
+    cfg = Config([Collection("Season 8", pattern, pattern, None, "20210615", "20220405")], [beef], None, None)
+    assert cli._discover(conn, cfg, beef, None) == 2
+    assert cli._discover(conn, cfg, beef, None) == 2
+    assert listed == [None, cli.RECENT_UPLOADS]      # every upload the first time, only the newest after
+    assert dict(conn.execute("SELECT video_id, via FROM collection_videos")) == {"e1": "playlist:PL8", "e12": "title"}
