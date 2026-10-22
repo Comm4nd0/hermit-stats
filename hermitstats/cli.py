@@ -389,7 +389,7 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("update", help="sync, build and push in one go")
     sync_args(s)
-    s.set_defaults(fn=cmd_update)
+    s.set_defaults(fn=cmd_update, season=None)    # build every season
 
     s = sub.add_parser("status", help="videos and transcripts per Hermit")
     s.set_defaults(fn=cmd_status)

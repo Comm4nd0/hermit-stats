@@ -308,3 +308,12 @@ only_listed = true
     assert meta["teams"]["Wild Life"] == {"Hermits": ["grian"], "Friends of the Hermits": ["inthelittlewood"]}
     assert "Season 11" not in meta["teams"]
     assert {h["slug"]: h["hermit"] for h in meta["hermits"]} == {"grian": True, "inthelittlewood": False}
+
+
+def test_update_runs_build_on_every_season(monkeypatch):
+    from hermitstats import cli
+    ran = []
+    for name in ("cmd_sync", "cmd_build", "cmd_push"):
+        monkeypatch.setattr(cli, name, lambda args, name=name: ran.append((name, args.season)) or 0)
+    assert cli.main(["update"]) == 0
+    assert ran == [("cmd_sync", None), ("cmd_build", None), ("cmd_push", None)]

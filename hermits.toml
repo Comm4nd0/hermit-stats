@@ -24,6 +24,7 @@ archive_channels = ["@TheHermitcraftArchive"]
 [deploy]
 target = "luma:/root/caddy/static/hermit-stats/"
 url = "https://hermit-stats.com"
+
 [[collection]]
 name = "Season 11"
 playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(11|xi)\b'
@@ -37,6 +38,7 @@ starts = "2025-11-01"
 "Fire Department" = ["PearlescentMoon", "impulseSV", "Mumbo Jumbo", "FalseSymmetry", "Joe Hills"]
 "Frenemies" = ["SmallishBeans", "BdoubleO100", "Docm77", "GoodTimesWithScar"]
 "ZITS" = ["Zedaph", "impulseSV", "Tango Tek", "Skizzleman"]
+
 [[collection]]
 name = "Season 10"
 playlist = 'hermit\s*craft[\s:|-]*(season\s*|s)?(10|x)\b'
@@ -45,11 +47,7 @@ skip = 'stream|shorts|\blive\b'
 starts = "2023-03-01"
 members = ["BdoubleO100", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GeminiTay", "Grian", "Hypnotizd", "iJevin", "impulseSV", "Joe Hills", "Keralis", "Mumbo Jumbo", "PearlescentMoon", "Rendog", "GoodTimesWithScar", "SmallishBeans", "Skizzleman", "Tango Tek", "VintageBeef", "Welsknight", "xBCrafted", "Xisumavoid", "Zedaph", "ZombieCleo", "Iskall85", "Stressmonster101"]
 
-# ---------------------------------------------------------------- Hermitcraft Seasons 7-9
-
-# Rosters from the Hermitcraft wiki. The patterns allow "vanilla/server/smp"-style words and roman numerals
-# before the number ("Hermitcraft VII", "HermitCraft8"); `skip` leaves out the modded and minigame series that
-# reuse the name (FTB, UHC, HermitPack...).
+# ---------------------------------------------------------------- Hermitcraft Seasons 1-9
 
 # Opened 5 Mar 2022. TinfoilChef died on 13 Aug 2022, mid-season. Empires/event cameos left out.
 [[collection]]
@@ -93,6 +91,104 @@ members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymm
            "Hypnotizd", "iJevin", "impulseSV", "Iskall85", "Jessassin", "Joe Hills", "Keralis", "Mumbo Jumbo",
            "PythonGB", "Rendog", "Stressmonster101", "Tango Tek", "TinfoilChef", "VintageBeef", "Welsknight",
            "xBCrafted", "Xisumavoid", "Zedaph", "ZombieCleo"]
+
+# Opened 19 Jul 2018. xBCrafted only streamed. Hypnotizd and VintageBeef were whitelisted but never joined: left out.
+[[collection]]
+name = "Season 6"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(6|vi)\b'
+video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(6|vi)\b'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2018-07-15"
+ends = "2020-03-31"
+members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "FalseSymmetry", "GoodTimesWithScar", "Grian", "iJevin",
+           "impulseSV", "Iskall85", "Jessassin", "Joe Hills", "Keralis", "Mumbo Jumbo", "PythonGB", "Rendog",
+           "Stressmonster101", "Tango Tek", "TinfoilChef", "Welsknight", "xBCrafted", "Xisumavoid", "Zedaph",
+           "ZombieCleo"]
+
+# Opened 13 Apr 2017. Hypnotizd, Jessassin and Keralis were whitelisted but never appeared: left out.
+[[collection]]
+name = "Season 5"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(5|v)\b'
+video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(5|v)\b'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2017-04-09"
+ends = "2018-08-20"
+members = ["BdoubleO100", "Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GoodTimesWithScar", "iJevin",
+           "impulseSV", "Iskall85", "Joe Hills", "Mumbo Jumbo", "PythonGB", "Rendog", "Stressmonster101", "Tango Tek",
+           "TinfoilChef", "VintageBeef", "Welsknight", "xBCrafted", "Xisumavoid", "Zedaph", "ZombieCleo"]
+
+# Opened 25 Feb 2016. Hypnotizd and Monkeyfarm logged on but made no episodes. KingDaddyDMAC, Pungence, Skyzm, Sl1pg8r and
+# Topmass were on the opening whitelist and removed for inactivity without appearing (wiki: "left this season").
+# Keralis was whitelisted but never appeared: left out.
+[[collection]]
+name = "Season 4"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(4|iv)\b'
+video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(4|iv)\b'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2016-02-20"
+ends = "2017-05-15"
+members = ["Biffa2001", "Cubfan135", "Docm77", "Etho", "FalseSymmetry", "GoodTimesWithScar", "Hypnotizd", "iJevin",
+           "impulseSV", "Iskall85", "Jessassin", "Joe Hills", "KingDaddyDMAC", "Monkeyfarm", "Mumbo Jumbo", "Pungence",
+           "PythonGB", "Rendog", "Skyzm", "Sl1pg8r", "Tango Tek", "TinfoilChef", "TopMass", "VintageBeef", "Welsknight",
+           "xBCrafted", "Xisumavoid", "ZombieCleo", "Zueljin"]
+
+# Opened 17 Oct 2014 (Amplified world). Juicetra appeared on day one but made no episodes; the wiki lists Marriland and
+# Red3yz as leaving this season (whitelisted, no Season 3 episodes). Jessassin was whitelisted but never appeared: left out.
+[[collection]]
+name = "Season 3"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(3|iii)\b|hermit\s*craft[\s:|!~\[\(\-]*(?:vanilla[\s:|!~\[\(\-]*)?amplified'
+video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(3|iii)\b|hermit\s*craft[\s:|!~\[\(\-]*(?:vanilla[\s:|!~\[\(\-]*)?amplified'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2014-10-13"
+ends = "2016-03-25"
+members = ["Biffa2001", "Docm77", "Etho", "FalseSymmetry", "Hypnotizd", "IAmSp00n", "iJevin", "impulseSV", "Joe Hills",
+           "Juicetra", "Keralis", "KingDaddyDMAC", "Marriland", "Monkeyfarm", "Mumbo Jumbo", "Pungence", "PythonGB",
+           "Red3yz", "Skyzm", "Sl1pg8r", "Spumwack", "Tango Tek", "TinfoilChef", "TopMass", "xBCrafted", "Xisumavoid",
+           "ZombieCleo", "Zueljin"]
+
+# Opened 9 Jun 2013 ("HermitCraft 2.0"). Dewtroid and VenomKisser joined but only streamed; CilantroGamer only streamed.
+[[collection]]
+name = "Season 2"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(2|ii)\b'
+video_title = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(2|ii)\b'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2013-06-05"
+ends = "2014-11-15"
+members = ["Aureylian", "Biffa2001", "CilantroGamer", "Dewtroid", "FalseSymmetry", "Hypnotizd", "IAmSp00n", "iJevin",
+           "Jessassin", "Joe Hills", "Juicetra", "Keralis", "Kiershar", "KingDaddyDMAC", "Luclin", "Marriland",
+           "Monkeyfarm", "Mumbo Jumbo", "Pungence", "Queenkinghappy", "Red3yz", "Skyzm", "Sl1pg8r", "Spumwack",
+           "Tango Tek", "ThePixelNerds", "TinfoilChef", "TopMass", "Unhost", "VenomKisser", "xBCrafted", "Xisumavoid",
+           "ZombieCleo", "Zueljin"]
+# Hermitcraft Seasons 1-9: rosters from the Hermitcraft fandom wiki (season pages, "Hermits" section),
+# channels checked with youtube.channel_playlists on 2026-10-21.
+#
+# Playlist names on old seasons are all over the place ("HermitCraft!", "Hermitcraft 2.0", "Hermitcraft II",
+# "HermitCraft Survival LP [SERIES 2]", "Minecraft HermitCraft Amplified Server Season 3", "HermitCraft8", ...).
+# The regexes allow optional "vanilla/amplified/survival lp/server/smp" words before an optional
+# "season/series/s" and the number (arabic or roman; \b keeps 1 from matching 10/11). Season 1 also takes a
+# bare "Hermitcraft"/"HermitCraft!"/"The HermitCraft Server!" playlist, since nobody numbered Season 1 at the time;
+# its video_title is any "hermitcraft" title not marked as Season 2, bounded by the date window.
+# `skip` adds the modded/minigame series that reuse the name (FTB, ModSauce, UHC, HermitPack, Battle Royale, GM4).
+
+# Opened 13 Apr 2012 (reset twice in the first two weeks). CilantroGamer, Dinnerbone and Marc IRL only streamed;
+# Brenybeast and Sokar joined but never posted. Cameos (SethBling, BlockFortress, Toby, Invis...) left out.
+[[collection]]
+name = "Season 1"
+series = "Hermitcraft"
+playlist = 'hermit\s*craft[\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:seasons?\s*|series\s*|s)?(1)\b|^\W*(?:minecraft\W*|the\s+|\w+:\s*)?hermit\s*craft(?:\W*(?:server|vanilla|smp|survival|the\s+original\s+series|with\s+joe\s+hills|red3yz))*\W*$'
+video_title = 'hermit\s*craft(?![\s:|!~\[\(\-]*(?:(?:vanilla|amplified|survival(?:\s*lp)?|(?:minecraft\s*)?server|smp)!?[\s:|!~\[\(\-]*)*(?:2\.0|ii\b|seasons?\s*2\b|series\s*2\b|s2\b))'
+skip = 'stream|shorts|\blive\b|\bftb\b|feed\s*the\s*beast|mod\s*sauce|\buhc\b|ultra\s*hardcore|battle\s*royale|tekkit|hermit\s*pack|gamemode\s*4|\bgm4\b'
+starts = "2012-04-08"
+ends = "2013-07-07"
+members = ["777static777", "Aureylian", "BdoubleO100", "Biffa2001", "BrenyBeast", "CilantroGamer", "Coestar",
+           "Cubehamster", "Dinnerbone", "Generikb", "Hypnotizd", "IAmSp00n", "Jessassin", "Joe Hills", "Juicetra",
+           "Keralis", "Kiershar", "KingDaddyDMAC", "Marc IRL", "Monkeyfarm", "Pungence", "Red3yz", "Shawnvmartin",
+           "Skyzm", "Sokar", "ThePixelNerds", "TopMass", "Unhost", "Xisumavoid"]
 # ---------------------------------------------------------------- The Life Series
 
 # The Life Series: many players keep no playlist for it, so titles matter more; their compilations,
@@ -106,6 +202,7 @@ skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teas
 starts = "2026-10-23"
 members = ["BigB", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Mumbo Jumbo",
            "PearlescentMoon", "SmallishBeans", "Solidarity", "ZombieCleo"]
+
 [[collection]]
 name = "Nice Life"
 series = "Life Series"
@@ -305,29 +402,34 @@ members = ["BdoubleO100", "BigB", "Etho", "GoodTimesWithScar", "Grian", "InTheLi
 "Dogwarts" = ["InTheLittleWood", "Rendog", "BigB", "Etho", "Skizzleman", "impulseSV", "SmallishBeans"]
 "Flower Husbands" = ["Dangthatsalongname", "Solidarity"]
 "The Swamp" = ["Etho", "impulseSV", "Tango Tek"]
+
 [[hermit]]
 name = "BdoubleO100"
 short = "Bdubs"
 channel = "@bdoubleo"
 aliases = ["bdubs", "b dubs", "bdubbs", "bdouble", "bdoubleo", "bee dubs"]
+
 [[hermit]]
 name = "Cubfan135"
 short = "Cub"
 channel = "@cubfan"
 aliases = ["cub", "cubfan", "cubs"]
 exclude = ["cub fan club"]
+
 [[hermit]]
 name = "Docm77"
 short = "Doc"
 channel = "@docm77"
 aliases = ["doc", "docm", "docm77", "doc m"]
 exclude = ["doc block", "document"]
+playlists = { "Season 3" = "PLvh8CGg6LWwoJjoig0esbDxjpfw4ncVCb" }
 
 [[hermit]]
 name = "Etho"
 short = "Etho"
 channel = "@EthosLab"
 aliases = ["etho", "ethos", "ethoslab", "ethos lab", "eto"]
+
 [[hermit]]
 name = "FalseSymmetry"
 short = "False"
@@ -335,50 +437,59 @@ channel = "@FalseSymmetry"
 aliases = ["false", "false symmetry", "falsesymmetry"]
 exclude = ["true or false", "true and false", "that's false", "is false", "false alarm", "false start",
            "false positive", "false flag"]
+
 [[hermit]]
 name = "GeminiTay"
 short = "Gem"
 channel = "@GeminiTayMC"
 aliases = ["gem", "gemini", "gemini tay", "geminitay"]
+
 [[hermit]]
 name = "Grian"
 short = "Grian"
 channel = "@Grian"
 aliases = ["grian", "grain", "grion", "gryan"]
 exclude = ["grain of", "the grain", "wood grain"]
+
 [[hermit]]
 name = "Hypnotizd"
 short = "Hypno"
 channel = "@hypnotizd"
 aliases = ["hypno", "hypnotized", "hypnotizd"]
+
 [[hermit]]
 name = "iJevin"
 short = "Jevin"
 channel = "@iJevin"
 aliases = ["jevin", "ijevin", "jevan", "javin"]
+playlists = { "Season 2" = "PL9heRuhTVdQSX6tsW9KTR1qd0q5MomgdE" }
 
 [[hermit]]
 name = "impulseSV"
 short = "Impulse"
 channel = "@impulseSV"
 aliases = ["impulse", "impulsesv", "impy"]
+
 [[hermit]]
 name = "Joe Hills"
 short = "Joe"
 channel = "@JoeHillsTSD"
 aliases = ["joe", "joe hills", "joehills"]
+playlists = { "Season 2" = "PLE75D8E8FA5BD0D0C", "Season 3" = "PL7On8E0_x1toKhhPoWt4rEGHIhc-FUUKh", "Season 4" = "PL7On8E0_x1toB6z-1uPa--k6cnH6zccg9" }
 
 [[hermit]]
 name = "Keralis"
 short = "Keralis"
 channel = "@Keralis"
 aliases = ["keralis", "keralas", "kerallis"]
+playlists = { "Season 3" = "PLs6cC73V4fptSkwSt3TOwoC3dSrzw0Cgm" }
 
 [[hermit]]
 name = "Mumbo Jumbo"
 short = "Mumbo"
 channel = "@ThatMumboJumbo"
 aliases = ["mumbo", "mumbo jumbo", "mumbojumbo", "mumbles"]
+
 [[hermit]]
 name = "PearlescentMoon"
 short = "Pearl"
@@ -386,66 +497,79 @@ channel = "@PearlescentMoon"
 aliases = ["pearl", "pearlescent", "pearlescent moon", "pearlescentmoon"]
 exclude = ["ender pearl", "ender pearls", "pearl stasis", "pearl chamber", "pearl cannon", "throw a pearl",
            "throw the pearl", "throw my pearl"]
+
 [[hermit]]
 name = "Rendog"
 short = "Ren"
 channel = "@rendog"
 aliases = ["ren", "rendog", "ren dog", "renbob"]
+
 [[hermit]]
 name = "GoodTimesWithScar"
 short = "Scar"
 channel = "@GoodTimesWithScar"
 aliases = ["scar", "scars", "goodtimeswithscar", "good times with scar"]
+
 [[hermit]]
 name = "SmallishBeans"
 short = "Joel"
 channel = "@SmallishBeans"
 aliases = ["joel", "smallishbeans", "smallish beans", "beans"]
 exclude = ["cocoa beans", "cocoa bean", "coffee beans"]
+
 [[hermit]]
 name = "Skizzleman"
 short = "Skizz"
 channel = "@MCSkizzleman"
 aliases = ["skizz", "skizzleman", "skiz", "skizzle"]
+
 [[hermit]]
 name = "Tango Tek"
 short = "Tango"
 channel = "UC4YUKOBld2PoOLzk0YZ80lw"
 aliases = ["tango", "tango tek", "tangotek", "tang"]
+
 [[hermit]]
 name = "VintageBeef"
 short = "Beef"
 channel = "@VintageBeef"
 aliases = ["beef", "vintage beef", "vintagebeef"]
 exclude = ["cooked beef", "raw beef", "beef jerky", "roast beef"]
+
 [[hermit]]
 name = "Welsknight"
 short = "Wels"
 channel = "@WelsknightGaming"
 aliases = ["wels", "welsknight", "wells", "welts"]
 exclude = ["oil wells", "wells of"]
+
 [[hermit]]
 name = "xBCrafted"
 short = "xB"
 channel = "@xBCrafted"
 aliases = ["xb", "xbcrafted", "x b"]
+
 [[hermit]]
 name = "Xisumavoid"
 short = "Xisuma"
 channel = "@xisumavoid"
 aliases = ["xisuma", "xisumavoid", "zuma", "x zuma", "xumavoid", "xisuma void"]
+
 [[hermit]]
 name = "Zedaph"
 short = "Zed"
 channel = "@Zedaph"
 aliases = ["zed", "zedaph", "zedaf"]
+
 [[hermit]]
 name = "ZombieCleo"
 short = "Cleo"
 channel = "@ZombieCleo"
 aliases = ["cleo", "zombie cleo", "zombiecleo", "clio"]
+playlists = { "Season 2" = "PLVO4L4qtJmBqbEDDL_J8oMSSSrVkPNlfe" }
 
 # Life Series players who aren't Hermits. `name` is their channel's name; `short` what everyone calls them.
+
 [[hermit]]
 name = "BigB"
 short = "BigB"
@@ -482,7 +606,30 @@ aliases = ["lizzie", "lizzy", "lizzi", "lizzie's", "ldshadowlady", "shadowlady",
 only_listed = true
 
 # ---------------------------------------------------------------- Former Hermits
+
 # ---------------------------------------------------------------- former Hermits (Seasons 1-9)
+# `name` is the channel's name (cleaned up where the channel title is a slogan: Biffa2001 = "Biffa Plays Indie Games",
+# Luclin = "Luclin Family", TinfoilChef = "TinfoilChef's Gaming Channel", Sl1pg8r = "Sl1pg8r - Daily Stuff and Things!",
+# Dinnerbone = "Nathan “Dinnerbone” Adams", VenomKisser = "ippy", Zueljin = "Zueljin Gaming"); `short` what people call them.
+# `playlists` come from the wiki's season pages. PL...Zum142QVR1... playlists are reuploads on "The Hermitcraft Archive"
+# (@TheHermitcraftArchive), used where the Hermit's own copies are gone.
+
+[[hermit]]
+name = "777static777"
+short = "Static"
+channel = "@777static777"
+aliases = ["777static777", "shaun static", "shaunstatic", "triple seven static"]
+exclude = ["static electricity", "static noise", "static image", "static ip", "stay static", "static camera", "static shot"]
+playlists = { "Season 1" = "PL1-h76yMkmtfPwk7osWXlu62fHfFV3hOR" }
+only_listed = true
+
+[[hermit]]
+name = "Aureylian"
+short = "Aurey"
+channel = "@Aureylian"
+aliases = ["aureylian", "aurey", "aurelian", "aurylian", "oralian", "aureliann"]
+playlists = { "Season 1" = "PL01kV0pVAnWYCad7KtdxMMr_18FrRiUPY", "Season 2" = "PL01kV0pVAnWbhQEZv9IX8wJ5N97QBDlDl" }
+only_listed = true
 
 # Every Hermitcraft episode is private: Seasons 1-4 on this (main) channel, Seasons 5-6 on "Biffa Plays Minecraft"
 # (UCFZNswya6SbFmjbspDXhCQA), which is deleted ("This channel is not available"). Kept for mentions.
@@ -493,6 +640,78 @@ channel = "@BiffaPlaysCitiesSkylines"
 aliases = ["biffa", "biffa2001", "biffer", "bifa", "biffa 2001"]
 only_listed = true
 
+# Joined Season 1 but never posted an episode.
+[[hermit]]
+name = "BrenyBeast"
+short = "Breny"
+channel = "@Breny"
+aliases = ["breny", "brenybeast", "breny beast", "brenny", "brennybeast"]
+only_listed = true
+
+# Only streamed (Twitch); no Hermitcraft videos on YouTube.
+[[hermit]]
+name = "CilantroGamer"
+short = "Cilantro"
+channel = "@CilantroGamer"
+aliases = ["cilantro", "cilantrogamer", "cilantro gamer"]
+exclude = ["cilantro leaves", "fresh cilantro", "chopped cilantro"]
+only_listed = true
+
+# Made one Hermitcraft video and deleted it.
+[[hermit]]
+name = "Coestar"
+short = "Coe"
+channel = "@Coestar"
+aliases = ["coestar", "coe", "co star", "coe star", "costar"]
+only_listed = true
+
+[[hermit]]
+name = "Cubehamster"
+short = "Cubehamster"
+channel = "@cubehamster"
+aliases = ["cubehamster", "cube hamster"]
+exclude = ["hamster wheel", "hamster cage", "pet hamster"]
+playlists = { "Season 1" = "PL8DA4B341385FF72E" }
+only_listed = true
+
+# Only streamed (Twitch); the playlist is the archive's copy of her streams.
+[[hermit]]
+name = "Dewtroid"
+short = "Dewtroid"
+channel = "@dewtroid"
+aliases = ["dewtroid", "dew troid", "dewtroyd"]
+playlists = { "Season 2" = "PLZum142QVR17YJ4VxxOBspEQSagjpAR6L" }
+only_listed = true
+
+# Mojang developer, briefly on the Season 1 server; only streamed.
+[[hermit]]
+name = "Dinnerbone"
+short = "Dinnerbone"
+channel = "@dinnerbone"
+aliases = ["dinnerbone", "dinner bone", "nathan adams"]
+exclude = ["named dinnerbone", "name it dinnerbone", "name them dinnerbone", "called dinnerbone", "dinnerbone name tag",
+           "dinnerbone nametag", "dinnerbone trick"]
+only_listed = true
+
+[[hermit]]
+name = "Generikb"
+short = "Generik"
+channel = "@Generikb"
+aliases = ["generik", "generikb", "generik b", "generic b", "genericb"]
+exclude = ["a generic", "pretty generic", "very generic", "so generic", "too generic", "generic name", "generic block",
+           "generic version", "generic looking", "generic house", "generic brand"]
+playlists = { "Season 1" = "PLD10F520D9B63EB06" }
+only_listed = true
+
+[[hermit]]
+name = "IAmSp00n"
+short = "Sp00n"
+channel = "@IAmSp00n"
+aliases = ["sp00n", "iamspoon", "iamsp00n", "i am spoon"]
+exclude = ["a spoon", "wooden spoon", "silver spoon", "spoon feed", "spoonful", "teaspoon", "table spoon", "spoon and fork"]
+playlists = { "Season 1" = "PLtdgAUT2pa3-Un6V1TEuV97YugZLtXaBw", "Season 2" = "PLtdgAUT2pa3-Un6V1TEuV97YugZLtXaBw" }   # one playlist for both
+only_listed = true
+
 # Also a Season 10 member until he resigned in Nov 2024 (the existing Season 10 entry has no members list, so it
 # won't search him with only_listed = true unless he is added to one).
 [[hermit]]
@@ -500,7 +719,7 @@ name = "Iskall85"
 short = "Iskall"
 channel = "@iskall85"
 aliases = ["iskall", "iskall85", "iskal", "is gall", "isgall", "iscall", "iskahl"]
-playlists = { "Season 7" = "PLQDo59MddgIcahwqJoRjKb2BFk0raWHgT", "Season 8" = "PLQDo59MddgIdzq-ZFFZin81aEN7BNbO7V", "Season 9" = "PLQDo59MddgIer3Mgdxb4SsUVh3HzU9iD2" }
+playlists = { "Season 4" = "PLQDo59MddgIexIkO7a_Hi5T83_zl7_4Kn", "Season 5" = "PLQDo59MddgIfE6LZ-ZXxOUO5VcJLzDXjk", "Season 6" = "PLQDo59MddgIc-bKlNjtK57FA8DELdBIhY", "Season 7" = "PLQDo59MddgIcahwqJoRjKb2BFk0raWHgT", "Season 8" = "PLQDo59MddgIdzq-ZFFZin81aEN7BNbO7V", "Season 9" = "PLQDo59MddgIer3Mgdxb4SsUVh3HzU9iD2" }
 only_listed = true
 
 [[hermit]]
@@ -508,15 +727,147 @@ name = "Jessassin"
 short = "Jess"
 channel = "@Jessassin"
 aliases = ["jessassin", "jess", "jessassassin", "jesassin", "jessasin", "jess assassin"]
+playlists = { "Season 1" = "PLD278E534A5C9FA69", "Season 2" = "PL-1S95SbGoW8CGV0h3tyTWD9BOZnjCb1G", "Season 4" = "PL-1S95SbGoW_o1KC8Y8U0WOq2n8sHIHZs", "Season 6" = "PL-1S95SbGoW-rucjQ2rllo5RRmJr042Xo" }
 only_listed = true
 
-# Left early in Season 7 without making any episodes; kept so mentions of him count.
+[[hermit]]
+name = "Juicetra"
+short = "Juice"
+channel = "@Juicetra"
+aliases = ["juicetra", "juicetre", "juice tra"]
+exclude = ["apple juice", "orange juice", "fruit juice", "juice box", "worth the juice", "squeeze the juice", "lemon juice"]
+playlists = { "Season 1" = "PLMopnJLfnrzcTe8JZ-QqVGcML2DKEsIIs", "Season 2" = "PLMopnJLfnrzcTe8JZ-QqVGcML2DKEsIIs" }   # one playlist for both
+only_listed = true
+
+[[hermit]]
+name = "Kiershar"
+short = "Kiershar"
+channel = "@kiershar"
+aliases = ["kiershar", "kier", "kiersha", "keirshar", "kearshar", "kier shar"]
+only_listed = true
+
+[[hermit]]
+name = "KingDaddyDMAC"
+short = "Dmac"
+channel = "@KingDaddyDmac"
+aliases = ["dmac", "d mac", "kingdaddydmac", "king daddy dmac", "kingdaddy", "king daddy", "deemac"]
+playlists = { "Season 1" = "PL7vFECXWtNMEXRfpI1OBLKInEdJ6NyHuj", "Season 2" = "PL7vFECXWtNMEXRfpI1OBLKInEdJ6NyHuj", "Season 3" = "PL7vFECXWtNMHIfy6xMPVl3zgQ6j8apgjE" }
+only_listed = true
+
+# Channel is "Luclin Family" (@minecraftworkbench); his Season 2 episodes survive only as archive reuploads.
+[[hermit]]
+name = "Luclin"
+short = "Luclin"
+channel = "@minecraftworkbench"
+aliases = ["luclin", "lucklin", "lucelin", "luclan"]
+playlists = { "Season 2" = "PLZum142QVR16htopxDxE1sQ6GHFPnqt8X" }
+only_listed = true
+
+# Mojang staff (as MidnightEnforcer), only streamed.
+[[hermit]]
+name = "Marc IRL"
+short = "Marc"
+channel = "@TheMarcIRL"
+aliases = ["marc irl", "midnightenforcer", "midnight enforcer", "marc"]
+only_listed = true
+
+# Episodes survive only as archive reuploads.
+[[hermit]]
+name = "Marriland"
+short = "Marriland"
+channel = "@marriland"
+aliases = ["marriland", "mariland", "marri", "mary land"]
+playlists = { "Season 2" = "PLZum142QVR16-M2upbthh5QdDYwFVkw-V" }
+only_listed = true
+
+[[hermit]]
+name = "Monkeyfarm"
+short = "Monkeyfarm"
+channel = "@monkeyfarm"
+aliases = ["monkeyfarm", "monkey farm"]
+exclude = ["monkey business", "monkey around", "monkeying around", "monkey see"]
+playlists = { "Season 1" = "PLA1nTfnXQpfqBWngr0Sc8HZW7ygdi6jX0", "Season 2" = "PLA1nTfnXQpfofL1iotPLKZXONLBclughS", "Season 3" = "PL742700FFFEF70836" }
+only_listed = true
+
+[[hermit]]
+name = "Pungence"
+short = "Pungence"
+channel = "@Pungence"
+aliases = ["pungence", "punjence"]
+exclude = ["pungent smell", "pungent odor", "pungent odour"]
+playlists = { "Season 1" = "PLlg4p5KBL2C1FKuVYZFJbcmWOl4APcuuh", "Season 2" = "PLlg4p5KBL2C1cZEkltY_xaDgFgUmP4AHa", "Season 3" = "PLlg4p5KBL2C04PFF-E3V6v6kpKEBfBWel" }
+only_listed = true
+
+# Seasons 3-5 on @PythonGB (playlists not shown on the channel's tab, but public); Season 6 on his second channel
+# "PythonMC" (@PythonMC, UCq-9jiz3k4LP6F39pZoq8MQ), added by hand below.
 [[hermit]]
 name = "PythonGB"
 short = "Python"
 channel = "@PythonGB"
 aliases = ["python", "pythongb", "python gb", "pythonmc"]
 exclude = ["python script", "python code", "monty python", "ball python", "in python", "python programming"]
+playlists = { "Season 3" = "PL4uClqJN4QKUPxIwSt5kvlGjK1PtvgWlU", "Season 4" = "PL4uClqJN4QKXRMqnR3LjsOmTfZV8Rx05O", "Season 5" = "PL4uClqJN4QKVRSDbT0xNSBzxeXmMjRLP6", "Season 6" = "PLbFBnggbJ1rmBAYQbA13lPEvrGbKXCSyS" }
+only_listed = true
+
+# "King Happy". This is his old Queenkinghappy channel, which holds the "Hermitcraft 2.0" playlist.
+[[hermit]]
+name = "Queenkinghappy"
+short = "King Happy"
+channel = "@Queenkinghappy"
+aliases = ["king happy", "kinghappy", "queenkinghappy", "queen king happy"]
+playlists = { "Season 2" = "PLv92QxXG-XxHrln-qFEO0Z3gY7OzmXHbq" }
+only_listed = true
+
+[[hermit]]
+name = "Red3yz"
+short = "Red3yz"
+channel = "@red3yz"
+aliases = ["red3yz", "red eyez", "red 3yz"]
+exclude = ["glowing red eyes", "with red eyes", "has red eyes", "the red eyes of"]
+playlists = { "Season 1" = "PL235r2Fauuih7C7tSy7CoA36cOgr1A5_K" }
+only_listed = true
+
+# His own Season 1 episodes are gone; the playlist is the archive's reuploads.
+[[hermit]]
+name = "Shawnvmartin"
+short = "Shawn"
+channel = "@shawnvmartin"
+aliases = ["shawn", "shawnvmartin", "shawn v martin", "shawn martin", "svm", "shawn v"]
+playlists = { "Season 1" = "PLZum142QVR14m9KYGlE5WmBqfDWykcYZm" }
+only_listed = true
+
+[[hermit]]
+name = "Skyzm"
+short = "Skyzm"
+channel = "@skyzm"
+aliases = ["skyzm", "skism", "schism", "skyzem", "skyism"]
+playlists = { "Season 1" = "PLsBqca1-_w7Az6RRoHWB_4Urv1akENmPp", "Season 2" = "PLsBqca1-_w7Az6RRoHWB_4Urv1akENmPp", "Season 3" = "PLsBqca1-_w7AoiuumqLbU4crLkJyeY82g" }
+only_listed = true
+
+[[hermit]]
+name = "Sl1pg8r"
+short = "Slip"
+channel = "@sl1pg8r"
+aliases = ["sl1pg8r", "slipgator", "slip gator", "slipgater"]
+exclude = ["slip up", "slip off", "slip through", "slip and fall", "slip away", "slip into", "slip out", "let it slip",
+           "pink slip", "slip on"]
+playlists = { "Season 2" = "PLvDeH9y3XxavkA5smTLtsxeeI-UItXDLp", "Season 3" = "PLvDeH9y3Xxat-StKz2_wqKL3_GBnIFNft" }
+only_listed = true
+
+# Joined Season 1 but never posted.
+[[hermit]]
+name = "Sokar"
+short = "Sokar"
+channel = "@SokarEntertainment"
+aliases = ["sokar", "sokar408", "socar"]
+only_listed = true
+
+# Episodes were unlisted on leaving and went private in YouTube's 2021 sweep of old unlisted videos. Kept for mentions.
+[[hermit]]
+name = "Spumwack"
+short = "Spum"
+channel = "@seanwillmon"
+aliases = ["spumwack", "spum", "spumwackles", "spoomwack", "spum wack"]
 only_listed = true
 
 # Made every video private when she left Hermitcraft in Nov 2024 (during Season 10); since May 2026 she has been
@@ -532,6 +883,15 @@ exclude = ["stress test", "stress testing", "stress tested", "stress relief", "s
            "under stress", "stress on", "don't stress"]
 only_listed = true
 
+# A group channel (alex2295, Joenagee and joshuaaap); quit YouTube early in Season 2.
+[[hermit]]
+name = "ThePixelNerds"
+short = "PixelNerds"
+channel = "@ThePixelNerds"
+aliases = ["pixel nerds", "pixelnerds", "the pixel nerds", "pixel nerd", "joshuaaap", "joenagee", "alex2295"]
+playlists = { "Season 1" = "PL91DB39B43E104B1F" }
+only_listed = true
+
 # Died 13 Aug 2022, during Season 9.
 [[hermit]]
 name = "TinfoilChef"
@@ -539,5 +899,41 @@ short = "TFC"
 channel = "@TinfoilChefsGamingChannel"
 aliases = ["tfc", "t f c", "tinfoil", "tinfoilchef", "tinfoil chef", "tin foil chef", "tin foil"]
 exclude = ["tinfoil hat", "tin foil hat", "tinfoil hats"]
-   # "Hermitcraft Vanilla with TFC"; 3-9 are "Hermitcraft Season N"
+playlists = { "Season 2" = "PLrp4YiBloNz64jDYmzBOB0j_EBnaKsdMo" }   # "Hermitcraft Vanilla with TFC"; 3-9 are "Hermitcraft Season N"
 only_listed = true
+
+# Channel was "Minecrafted"; his early playlists are named "HermitCraft!" and "HermitCraft 3.0".
+[[hermit]]
+name = "TopMass"
+short = "Topmass"
+channel = "@TopMass"
+aliases = ["topmass", "top mass", "minecrafted"]
+playlists = { "Season 1" = "PL9188F5316A0720BB", "Season 2" = "PL9188F5316A0720BB", "Season 3" = "PLoKHWOFLcwuYRI33IXmBdEWYst31q6N2d" }
+only_listed = true
+
+# Channel "UNHOST" (@nativisions) has no Hermitcraft playlist; the playlist is the archive's reuploads.
+[[hermit]]
+name = "Unhost"
+short = "Unhost"
+channel = "@nativisions"
+aliases = ["unhost", "un host"]
+playlists = { "Season 1" = "PLZum142QVR14-WZMPa8CwNtAH8vWZGuDn" }
+only_listed = true
+
+# Now "ippy" (@ippybipi); joined Season 2 and only streamed.
+[[hermit]]
+name = "VenomKisser"
+short = "Venom"
+channel = "@ippybipi"
+aliases = ["venomkisser", "venom kisser", "venom", "ippy"]
+only_listed = true
+
+# His first season was Season 2, so his playlist is "HermitCraft Vanilla Season 1"; Season 3 is "HermitCraft Amplified".
+[[hermit]]
+name = "Zueljin"
+short = "Zueljin"
+channel = "@zueljin"
+aliases = ["zueljin", "zuel", "zuljin", "zul jin", "zuel jin", "zooljin"]
+playlists = { "Season 2" = "PLk6W1KxWnn5D9Y5zmoPbvFrjtJ5T_HVNp", "Season 3" = "PLk6W1KxWnn5ANivDF0m4fpc0YKlzIYU74" }
+only_listed = true
+
