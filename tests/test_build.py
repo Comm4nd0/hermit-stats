@@ -1,3 +1,4 @@
+import pytest
 import json
 import sqlite3
 from collections import Counter
@@ -356,3 +357,29 @@ def test_episodes_left_out_of_a_season_playlist_are_listed_on_the_status_page(tm
     assert conn.execute("SELECT via FROM collection_videos WHERE video_id = 'e1'").fetchone()[0] == "playlist:PL8"
     # the renamed import and the upload from before the season aren't playlist mistakes
     assert [(u["id"], u["h"], u["c"]) for u in build.status(conn, cfg)["unlisted"]] == [("e12", "vintagebeef", "Season 8")]
+
+
+def test_discovery_drops_title_matches_that_skip_now_rules_out(tmp_path, monkeypatch):
+    from hermitstats import cli, youtube
+    conn = db.connect(tmp_path / "t.db")
+    monkeypatch.setattr(youtube, "channel_playlists", lambda *a, **k: {"id": "UCj", "name": "Joe", "avatar_url": None, "playlists": []})
+    monkeypatch.setattr(youtube, "list_uploads", lambda *a, **k: [{"id": "ep", "title": "Hermitcraft 9 ep 4", "upload_date": None}])
+    db.upsert_channel(conn, "UCj", "joe-hills", "Joe", "@joe", None)
+    for vid, title in [("ep", "Hermitcraft 9 ep 4"), ("vod", "VOD: planning call on HermitCraft 9")]:
+        db.upsert_video(conn, "UCj", {"id": vid, "title": title})
+        db.add_to_collection(conn, "Season 9", vid, "title")
+    pattern = re.compile(r"hermitcraft\s*9", re.I)
+    joe = Hermit("Joe Hills", "@joe", ["joe"])
+    cfg = Config([Collection("Season 9", pattern, pattern, re.compile(r"\bvod\b", re.I))], [joe], None, None)
+    assert cli._discover(conn, cfg, joe, None) == 1
+    assert [r[0] for r in conn.execute("SELECT video_id FROM collection_videos")] == ["ep"]
+
+
+def test_a_video_from_outside_its_seasons_is_not_transcribed(monkeypatch):
+    from types import SimpleNamespace
+    from hermitstats import cli, youtube
+    monkeypatch.setattr(youtube, "fetch_details", lambda vid, cookies: ({"id": vid, "upload_date": "20170101"}, {}))
+    monkeypatch.setattr(cli, "from_captions", lambda *a, **k: pytest.fail("fetched captions"))
+    s1 = Collection("Season 1", re.compile("x"), None, None, "20120408", "20130707")
+    args = SimpleNamespace(pause=(0, 0), cookies=None, cookies_from_browser=None, whisper="fallback", lang="en")
+    assert cli._fetch("v", True, [s1], args)[3] is False

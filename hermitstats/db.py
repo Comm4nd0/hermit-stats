@@ -115,6 +115,10 @@ def add_to_collection(conn, collection: str, video_id: str, via: str) -> None:
         (collection, video_id, via))
 
 
+def remove_from_collection(conn, collection: str, video_id: str) -> None:
+    conn.execute("DELETE FROM collection_videos WHERE collection = ? AND video_id = ?", (collection, video_id))
+
+
 def has_transcript(conn, video_id: str) -> bool:
     return conn.execute("SELECT 1 FROM transcripts WHERE video_id = ?", (video_id,)).fetchone() is not None
 

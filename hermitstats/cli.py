@@ -85,6 +85,12 @@ def _discover(conn, cfg, hermit, cookies) -> int:
                     ids.add(v["id"])
             if picked and candidates is uploads:
                 db.set_kv(conn, swept, today)
+            for vid, title in conn.execute(
+                    """SELECT v.id, v.title FROM collection_videos cv JOIN videos v ON v.id = cv.video_id
+                       WHERE cv.collection = ? AND cv.via = 'title' AND v.channel = ?""", (coll.name, info["id"])).fetchall():
+                if not coll.wants(title):     # a stream or compilation matched before `skip` knew better
+                    db.remove_from_collection(conn, coll.name, vid)
+                    ids.discard(vid)
             conn.commit()
         how = (f"{len(picked)} playlist{'s' * (len(picked) != 1)}" if picked
                else "title match" if coll.video_title else "nothing to match")
@@ -105,14 +111,20 @@ def _cookies(args) -> youtube.Cookies | None:
     return None
 
 
-def _fetch(vid: str, need_transcript: bool, args):
-    """Network part of processing one video, run in worker threads."""
+def _fetch(vid: str, need_transcript: bool, colls: list, args):
+    """Network part of processing one video, run in worker threads. A video turning out to be from outside every
+    season it was matched to (its date is only known now) needs no transcript."""
     time.sleep(random.uniform(*args.pause))     # YouTube bot-checks bursts of requests from one IP
     meta, info = youtube.fetch_details(vid, _cookies(args))
+    need_transcript = need_transcript and _in_season(colls, meta["upload_date"])
     captions = None
     if need_transcript and args.whisper != "always":
         captions = from_captions(info, args.lang, allow_auto=True)
-    return meta, info, captions
+    return meta, info, captions, need_transcript
+
+
+def _in_season(colls: list, upload_date: str | None) -> bool:
+    return not colls or any(c.wants("", upload_date) for c in colls)
 
 
 def cmd_sync(args) -> int:
@@ -153,6 +165,12 @@ def cmd_sync(args) -> int:
     for vid, coll in conn.execute("SELECT video_id, collection FROM collection_videos"):
         season[vid] = min(season.get(vid, len(rank)), rank.get(coll, len(rank)))
     todo = [r for r in todo if season.get(r["id"], len(rank)) < len(rank)]    # skip seasons no longer configured
+    colls_of = {}
+    for vid, coll in conn.execute("SELECT video_id, collection FROM collection_videos"):
+        if coll in rank:
+            colls_of.setdefault(vid, []).append(cfg.collections[rank[coll]])
+    # A loose title pattern (Season 1's) also matches later seasons' episodes; their dates rule them out.
+    todo = [r for r in todo if db.has_transcript(conn, r["id"]) or _in_season(colls_of.get(r["id"]), r["upload_date"])]
     todo.sort(key=lambda r: (db.has_transcript(conn, r["id"]), season.get(r["id"], len(rank))))
     if args.limit:
         todo = todo[:args.limit]
@@ -171,13 +189,13 @@ def cmd_sync(args) -> int:
                         TimeElapsedColumn(), console=console)
     with progress, ThreadPoolExecutor(args.workers) as pool:
         task = progress.add_task("Fetching", total=len(work))
-        futures = {pool.submit(_fetch, r["id"], need and not db.has_transcript(conn, r["id"]), args): (r, need)
+        futures = {pool.submit(_fetch, r["id"], need and not db.has_transcript(conn, r["id"]), colls_of.get(r["id"]), args): (r, need)
                    for r, need in work}
         for fut in as_completed(futures):
             r, need = futures[fut]
             progress.update(task, description=f"[dim]{(r['title'] or r['id'])[:50]}")
             try:
-                meta, info, captions = fut.result()
+                meta, info, captions, wanted = fut.result()
                 owner = info.get("channel_id") or r["channel"]
                 if (info.get("uploader_id") or "").lower().lstrip("@") in cfg.archive_channels:
                     owner = r["channel"]    # a reupload of a hermit's episode: still theirs
@@ -185,7 +203,9 @@ def cmd_sync(args) -> int:
                     db.upsert_channel(conn, owner, None, info.get("channel"), info.get("channel_url"), None)
                     known[owner] = None
                 db.upsert_video(conn, owner, meta)
-                if need and not db.has_transcript(conn, r["id"]):
+                if need and not wanted:
+                    db.set_error(conn, r["id"], None)
+                elif need and not db.has_transcript(conn, r["id"]):
                     result = captions
                     budget_left = args.whisper_limit is None or whispered < args.whisper_limit
                     if result is None and whisper is not None and budget_left:

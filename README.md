@@ -17,7 +17,8 @@ Pick a season and any Hermits (or all of them) and see:
 Click an episode anywhere (Videos table or charts, search results, What's new) for its own page: its numbers
 against that Hermit's usual, who's named when (each dot links to that moment), pace through the episode, the
 words that stand out from their other episodes, and the transcript. **Status** (footer link) shows when the site
-was built, the last sync run, and every video still waiting for a transcript and why.
+was built, the last sync run, every video still waiting for a transcript and why, and episodes missing from
+their creator's own season playlist (found by title instead).
 
 Selecting 1–3 Hermits compares them side by side (each keeps one colour everywhere). Every chart has a
 **Table** view. The URL keeps the selection, so links can be shared.
