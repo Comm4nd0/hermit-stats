@@ -339,3 +339,20 @@ def test_an_ended_season_is_swept_once_for_episodes_left_out_of_the_playlist(tmp
     assert cli._discover(conn, cfg, beef, None) == 2
     assert listed == [None, cli.RECENT_UPLOADS]      # every upload the first time, only the newest after
     assert dict(conn.execute("SELECT video_id, via FROM collection_videos")) == {"e1": "playlist:PL8", "e12": "title"}
+
+
+def test_episodes_left_out_of_a_season_playlist_are_listed_on_the_status_page(tmp_path):
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_channel(conn, "UCb", "vintagebeef", "Beef", "@VintageBeef", None)
+    db.upsert_playlist(conn, "PL8", "UCb", "Hermitcraft 8", "Season 8")
+    for vid, title, day in [("e1", "Hermitcraft 8 Episode 1", "20210709"), ("e12", "Secret Booth! - HERMITCRAFT 8 - Episode 12", "20211020"),
+                            ("vod", "VOD: planning call", "20211101"), ("s7", "Hermitcraft 8 years on", "20200301")]:
+        db.upsert_video(conn, "UCb", {"id": vid, "title": title, "upload_date": day})
+        db.add_to_collection(conn, "Season 8", vid, "title")
+    db.add_to_collection(conn, "Season 8", "e1", "playlist:PL8")     # found by title first, in the playlist after
+    pattern = re.compile(r"hermitcraft\s*8", re.I)
+    cfg = Config([Collection("Season 8", pattern, pattern, None, "20210615", "20220405")],
+                 [Hermit("VintageBeef", "@VintageBeef", ["beef"])], None, None)
+    assert conn.execute("SELECT via FROM collection_videos WHERE video_id = 'e1'").fetchone()[0] == "playlist:PL8"
+    # the renamed import and the upload from before the season aren't playlist mistakes
+    assert [(u["id"], u["h"], u["c"]) for u in build.status(conn, cfg)["unlisted"]] == [("e12", "vintagebeef", "Season 8")]

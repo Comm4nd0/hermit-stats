@@ -166,7 +166,8 @@ def reason(error: str | None, details_at: int | None) -> str:
 
 
 def status(conn, cfg: Config) -> dict:
-    """What the status page shows: the last sync run and every video still without a transcript."""
+    """What the status page shows: the last sync run, every video still without a transcript, and episodes
+    missing from their season playlist."""
     colls = {c.name: c for c in cfg.collections}
     waiting = []
     for r in db.waiting(conn):
@@ -174,7 +175,16 @@ def status(conn, cfg: Config) -> dict:
         if cs:
             waiting.append({"id": r["id"], "h": r["hermit"], "c": cs, "t": r["title"], "d": _date(r["upload_date"]),
                             "why": reason(r["error"], r["details_at"]), "at": r["error_at"]})
-    return {"generated": int(time.time()), "sync": db.get_kv(conn, "last_sync"), "waiting": waiting}
+    # Episodes missing from their creator's season playlist. A title that no longer matches the season was
+    # probably renamed since it was imported, so it isn't listed as one.
+    order = {c.name: i for i, c in enumerate(cfg.collections)}
+    unlisted = [{"id": r["id"], "h": r["hermit"], "c": r["collection"], "t": r["title"], "d": _date(r["upload_date"])}
+                for r in db.unlisted(conn) if r["collection"] in colls and r["upload_date"]
+                and colls[r["collection"]].wants(r["title"], r["upload_date"])
+                and colls[r["collection"]].video_title and colls[r["collection"]].video_title.search(r["title"] or "")]
+    unlisted.sort(key=lambda u: order[u["c"]])
+    return {"generated": int(time.time()), "sync": db.get_kv(conn, "last_sync"), "waiting": waiting,
+            "unlisted": unlisted}
 
 
 def teams(coll, hermits: dict, present: set) -> dict[str, list[str]]:

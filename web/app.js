@@ -1443,6 +1443,12 @@ TABS.status = async function (token) {
       cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'season', label: 'Season' }, { k: 'd', label: 'Uploaded' },
         { k: 't', label: 'Title', link: r => ytUrl(r.id) }, { k: 'why', label: 'Why' }, { k: 'since', label: 'Since' }],
       rows: st.waiting.map(w => ({ ...w, hermit: name(w.h), season: w.c.join(', '), t: w.t || w.id, since: w.at ? ago(w.at) : '' })) } } : null });
+  const unlisted = st.unlisted || [];
+  card(el, { title: 'Missing from a season playlist', wide: true,
+    sub: `${full(unlisted.length)} episode${unlisted.length === 1 ? '' : 's'} found by title that aren’t in the creator’s own season playlist · Hermits: adding them helps anyone watching in order`,
+    build: () => unlisted.length ? { tableOnly: true, table: {
+      cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'c', label: 'Season' }, { k: 'd', label: 'Uploaded' }, { k: 't', label: 'Title', link: r => ytUrl(r.id) }],
+      rows: unlisted.map(u => ({ ...u, hermit: name(u.h), t: u.t || u.id })) } } : { empty: 'Every episode found is in its creator’s season playlist.' } });
   card(el, { title: 'Episodes by Hermit', wide: true, sub: 'Transcribed episodes in the stats and videos still waiting, per season',
     build: () => {
       const rows = [];

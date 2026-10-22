@@ -107,8 +107,12 @@ def upsert_playlist(conn, playlist_id: str, channel: str, title: str, collection
 
 
 def add_to_collection(conn, collection: str, video_id: str, via: str) -> None:
-    conn.execute("INSERT OR IGNORE INTO collection_videos (collection, video_id, via) VALUES (?, ?, ?)",
-                 (collection, video_id, via))
+    """A video first found by its title that turns up in a playlist later is recorded as the playlist's."""
+    conn.execute(
+        """INSERT INTO collection_videos (collection, video_id, via) VALUES (?, ?, ?)
+           ON CONFLICT(collection, video_id) DO UPDATE SET via = excluded.via
+           WHERE excluded.via LIKE 'playlist:%' AND collection_videos.via NOT LIKE 'playlist:%'""",
+        (collection, video_id, via))
 
 
 def has_transcript(conn, video_id: str) -> bool:
@@ -207,3 +211,15 @@ def waiting(conn) -> list[dict]:
            GROUP BY v.id ORDER BY v.upload_date DESC"""
     ).fetchall()
     return [{**dict(r), "collections": sorted(set(r["collections"].split("|")))} for r in rows]
+
+
+def unlisted(conn) -> list[sqlite3.Row]:
+    """Videos found only by their title although their channel has a playlist for that collection: episodes
+    the creator left out of their season playlist."""
+    return conn.execute(
+        """SELECT v.id, v.title, v.upload_date, c.hermit, cv.collection
+           FROM collection_videos cv JOIN videos v ON v.id = cv.video_id JOIN channels c ON c.id = v.channel
+           WHERE cv.via = 'title' AND c.hermit IS NOT NULL
+             AND EXISTS (SELECT 1 FROM playlists p WHERE p.channel = v.channel AND p.collection = cv.collection)
+           ORDER BY c.hermit, v.upload_date"""
+    ).fetchall()
