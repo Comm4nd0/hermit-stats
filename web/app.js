@@ -843,6 +843,70 @@ const TABS = {
           const [a, b] = k.split('>');
           return { name: `${name(a)} in ${name(b)}’s`, slug: a, value: Math.round(t / 60), extra: `<br>in ${n} episode${n === 1 ? '' : 's'}` };
         }), { unit: 'minutes', labelWidth: 200 }) });
+
+      const social = {};   // host -> [seconds other Hermits talk, seconds of all speech, {guest: seconds}]
+      for (const v of split) {
+        const x = social[v.h] ??= [0, 0, {}];
+        for (const [k, t] of Object.entries(v.sp)) {
+          x[1] += t;
+          if (k !== v.h && H[k]) { x[0] += t; x[2][k] = (x[2][k] || 0) + t; }
+        }
+      }
+      card(el, { title: 'How social their episodes are', sub: 'Share of the talking in each Hermit’s own episodes that’s other Hermits',
+        build: () => hbar(scope().filter(s => social[s]?.[1]).map(s => {
+          const [o, t, by] = social[s], top = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 3);
+          return { name: name(s), slug: s, value: 100 * o / t,
+            extra: top.length ? '<br>Heard most: ' + top.map(([k, x]) => `${esc(name(k))} ${Math.round(x / 60)} min`).join(', ') : '' };
+        }), { unit: '%', decimals: 0, avg: true }) });
+
+      const talk = {}, sw = {};   // "a+b" -> [a's words, b's words, episodes] talking to each other; "a+b" -> [switches, episodes]
+      for (const v of split) {
+        for (const [k, [a, b]] of Object.entries(v.cv || {})) { const x = talk[k] ??= [0, 0, 0]; x[0] += a; x[1] += b; x[2]++; }
+        for (const [k, n] of Object.entries(v.sw || {})) { const x = sw[k] ??= [0, 0]; x[0] += n; x[1]++; }
+      }
+      const mine = k => !sel.size || k.split('+').some(s => sel.has(s));
+      const duo = (a, b) => `${name(a)} & ${name(b)}`;
+      card(el, { title: 'Who carries the conversation', wide: true,
+        sub: 'Each one’s share of the words when two Hermits are talking to each other (within half a minute of one answering the other) · the pairs who talk together most',
+        build: () => {
+          const rows = Object.entries(talk).filter(([k]) => mine(k) && k.split('+').every(s => H[s])).sort((x, y) => y[1][0] + y[1][1] - x[1][0] - x[1][1]).slice(0, 15)
+            .map(([k, [ta, tb, n]]) => {
+              let [a, b] = k.split('+');
+              if (sel.size ? sel.has(b) && !sel.has(a) : tb > ta) { [a, b] = [b, a]; [ta, tb] = [tb, ta]; }
+              return { a, b, pa: 100 * ta / (ta + tb), words: ta + tb, n };
+            });
+          if (!rows.length) return null;
+          const fill = [css('--s1'), css('--s2')];
+          const series = [0, 1].map(i => ({
+            type: 'bar', stack: 'share', barMaxWidth: 18,
+            data: rows.map(r => ({ value: +(i ? 100 - r.pa : r.pa).toFixed(1), who: i ? r.b : r.a, r })),
+            itemStyle: { color: fill[i], borderRadius: i ? [0, 4, 4, 0] : [4, 0, 0, 4] },
+            label: { show: true, color: '#fff', fontSize: 11, fontWeight: 600,
+              formatter: p => p.value >= 18 ? `${name(p.data.who)} ${Math.round(p.value)}%` : `${Math.round(p.value)}%` },
+          }));
+          return {
+            height: rows.length * 30 + 40,
+            option: {
+              ...base(),
+              grid: { ...base().grid, left: 16, top: 8, right: 16 },
+              tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(`${Math.round(p.value)}%`, `${name(p.data.who)}’s share`,
+                `<br>${full(p.data.r.words)} words between them, in ${p.data.r.n} episode${p.data.r.n === 1 ? '' : 's'}`) },
+              xAxis: axis({ type: 'value', max: 100, axisLabel: { show: false }, splitLine: { show: false } }),
+              yAxis: axis({ type: 'category', inverse: true, data: rows.map(r => duo(r.a, r.b)), axisLine: { show: false },
+                axisLabel: { color: css('--ink-2'), width: 200, overflow: 'truncate', ellipsis: '…' } }),
+              series,
+            },
+            onClick: p => toggle(p.data.who),
+            table: { cols: [{ k: 'pair', label: 'Pair' }, { k: 'sa', label: 'First', n: true, f: v => v.toFixed(0) + '%' },
+              { k: 'sb', label: 'Second', n: true, f: v => v.toFixed(0) + '%' }, { k: 'words', label: 'Words', n: true, f: full }],
+              rows: rows.map(r => ({ pair: duo(r.a, r.b), sa: r.pa, sb: 100 - r.pa, words: r.words })) },
+          };
+        } });
+      card(el, { title: 'Best double acts', sub: 'Times the talking passes back and forth between two Hermits: one answering the other within a few seconds',
+        build: () => hbar(Object.entries(sw).filter(([k]) => mine(k) && k.split('+').every(s => H[s])).map(([k, [n, e]]) => {
+          const [a, b] = k.split('+');
+          return { name: duo(a, b), slug: sel.has(b) ? b : a, value: n, extra: `<br>in ${e} episode${e === 1 ? '' : 's'}` };
+        }), { unit: 'back-and-forths', labelWidth: 200 }) });
     }
     card(el, { title: 'Named in episode titles', sub: 'Episodes whose title names another Hermit — usually a collab or a prank',
       build: () => {

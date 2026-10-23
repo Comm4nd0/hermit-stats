@@ -168,6 +168,42 @@ def split_speakers(v: dict, slug: str, hermits) -> tuple[str, dict[str, str], di
     return " ".join(by.get(slug, [])), guests, json.loads(v["airtime"]), segments
 
 
+def conversations(segments: list[dict], hermits, gap: float = 5.0, near: float = 30.0
+                  ) -> tuple[dict[str, int], dict[str, list[int]]]:
+    """In voice-split segments: ({"a+b": times the talking passed between a and b}, {"a+b": [a's words,
+    b's words] while they were talking to each other}). Passing means one Hermit answering the other within
+    `gap` seconds, so a back-and-forth counts and a guest turning up an hour later doesn't. "Talking to each
+    other" is within `near` seconds of a pass, so a long solo stretch either side doesn't count.
+    Unknown voices are stepped over."""
+    turns = [(s["who"], s["start"], s["end"], len(s["text"].split())) for s in segments if s.get("who") in hermits]
+    sw, passes = Counter(), defaultdict(list)
+    for (a, _, a_end, _), (b, b_start, _, _) in zip(turns, turns[1:]):
+        if a != b and b_start - a_end <= gap:
+            k = "+".join(sorted((a, b)))
+            sw[k] += 1
+            passes[k].append((a_end + b_start) / 2)
+    talk = {}
+    for k, ts in passes.items():
+        spans = []                                 # the moments around each pass, overlapping ones merged
+        for t in ts:
+            if spans and t - near <= spans[-1][1]:
+                spans[-1][1] = t + near
+            else:
+                spans.append([t - near, t + near])
+        a, b = k.split("+")
+        said = [0.0, 0.0]
+        for who, start, end, n in turns:
+            if who not in (a, b):
+                continue
+            if end > start:                        # a run's words are spread evenly over it
+                share = sum(max(0, min(end, hi) - max(start, lo)) for lo, hi in spans) / (end - start)
+            else:
+                share = float(any(lo <= start <= hi for lo, hi in spans))
+            said[who == b] += n * share
+        talk[k] = [round(said[0]), round(said[1])]
+    return dict(sw), talk
+
+
 def week_start(upload_dates: list[str]) -> str | None:
     """YYYYMMDD of the first day of the last WEEK_DAYS days that have uploads."""
     if not upload_dates:
@@ -344,6 +380,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
             dur = v["duration"] or 0
             # Pace is the owner's words over the time others weren't talking.
             own_secs = max(dur - sum(t for g, t in (air or {}).items() if g in guests), dur / 5)
+            sw, cv = conversations(segments, hermits) if air is not None else ({}, {})
             rows.append({
                 "id": v["id"], "h": slug, "c": v["collections"], "t": v["title"], "d": _date(v["upload_date"]),
                 "ts": v["timestamp"], "dur": round(dur), "v": v["view_count"], "l": v["like_count"],
@@ -353,7 +390,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
                 "laugh": text.laughs(raw), "music": text.music_cues(text.clean(v["text"])),
                 "m": dict(spoken), "tm": title_mentions, "lex": lex,
                 "open": " ".join(toks[:14]), "close": " ".join(toks[-14:]),
-                **({"sp": {k: round(t) for k, t in air.items()}, "g": heard} if air is not None else {}),
+                **({"sp": {k: round(t) for k, t in air.items()}, "g": heard, "sw": sw, "cv": cv} if air is not None else {}),
             })
         if slug:
             finish(slug, transcripts, episodes, ep_words)

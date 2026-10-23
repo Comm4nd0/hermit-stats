@@ -561,3 +561,16 @@ def test_windows_go_to_the_nearest_voiceprint_or_nobody():
     # the densest part of an owner's windows is them, however much a guest talks
     own = np.stack([a] * 30 + [b] * 10 + [c] * 5) + np.random.default_rng(0).normal(0, 0.05, (45, 3))
     assert speakers.voiceprint(own / np.linalg.norm(own, axis=1, keepdims=True)) @ a > 0.99
+
+
+def test_conversations_count_answers_not_reunions():
+    segs = [{"start": 0, "end": 4, "who": "impulsesv", "text": "a b c d"},
+            {"start": 5, "end": 6, "who": None, "text": "b"},          # an unknown voice is stepped over
+            {"start": 7, "end": 9, "who": "pearlescentmoon", "text": "c"},
+            {"start": 10, "end": 12, "who": "impulsesv", "text": "d e"},
+            {"start": 13, "end": 14, "who": "mob", "text": "e"},       # not a Hermit
+            {"start": 100, "end": 200, "who": "impulsesv", "text": "solo " * 50},   # a monologue later: not talk
+            {"start": 600, "end": 601, "who": "pearlescentmoon", "text": "f"}]   # ten minutes on: not an answer
+    sw, talk = build.conversations(segs, {"impulsesv", "pearlescentmoon"})
+    assert sw == {"impulsesv+pearlescentmoon": 2}
+    assert talk == {"impulsesv+pearlescentmoon": [6, 1]}
