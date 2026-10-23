@@ -40,22 +40,32 @@ def _date(d: str | None) -> str | None:
     return f"{d[:4]}-{d[4:6]}-{d[6:8]}" if d and len(d) == 8 else None
 
 
-def _chunks(segments: list[dict]) -> list[list]:
-    """Merge caption segments into ~20 s [start, text] chunks (auto-captions repeat lines; drop repeats)."""
-    out, cur, start, last = [], [], None, None
+def _chunks(segments: list[dict], owner: str | None = None) -> list[list]:
+    """Merge caption segments into ~20 s [start, text] chunks (auto-captions repeat lines; drop repeats).
+    Segments that know their speaker ("who") start a new chunk when the voice changes, and a chunk that isn't
+    the owner's says whose it is: [start, text, slug], or "?" for a voice that matched no Hermit."""
+    out, cur, start, last, who = [], [], None, None, owner
+
+    def flush():
+        out.append([int(start), " ".join(cur)] + ([who or "?"] if who != owner else []))
+
     for s in segments:
         t = text.clean(s["text"]).replace("[Music]", "").strip()
         if not t or t == last:
             continue
         last = t
+        if cur and s.get("who", owner) != who:
+            flush()
+            cur, start = [], None
+        who = s.get("who", owner)
         if start is None:
             start = s["start"]
         cur.append(t)
         if s["start"] - start >= CHUNK_SECONDS:
-            out.append([int(start), " ".join(cur)])
+            flush()
             cur, start = [], None
     if cur:
-        out.append([int(start), " ".join(cur)])
+        flush()
     return out
 
 
@@ -126,13 +136,36 @@ def catchphrases(bi: Counter, tri: Counter, bi_total: Counter, tri_total: Counte
 
 
 def mention_times(finder: MentionFinder, segments: list[dict], skip: str) -> list[list]:
-    """[[second, slug], ...] for every mention, timed by the caption segment it's in."""
-    toks, times = [], []
+    """[[second, slug], ...] for every mention, timed by the caption segment it's in. When segments know their
+    speaker, a mention by someone other than the owner (`skip`) says who: [second, slug, speaker or "?"]."""
+    if not any("who" in s for s in segments):
+        toks, times = [], []
+        for s in segments:
+            for t in text.tokenize(text.clean(s["text"])):
+                toks.append(t)
+                times.append(s["start"])
+        return [[int(times[i]), slug] for i, slug in finder.find(toks, skip=skip)]
+    out = []
     for s in segments:
-        for t in text.tokenize(text.clean(s["text"])):
-            toks.append(t)
-            times.append(s["start"])
-    return [[int(times[i]), slug] for i, slug in finder.find(toks, skip=skip)]
+        who = s["who"]
+        for _, slug in finder.find(text.tokenize(text.clean(s["text"])), skip=who):
+            out.append([int(s["start"]), slug] + ([who or "?"] if who != skip else []))
+    return out
+
+
+def split_speakers(v: dict, slug: str, hermits) -> tuple[str, dict[str, str], dict | None, list[dict]]:
+    """(the owner's words, {guest Hermit: their words}, seconds of speech per voice, caption segments with
+    their speaker). Without voice data every word is the owner's, as before; a voice that matched no Hermit
+    is nobody's."""
+    if not v.get("runs"):
+        return v["text"], {}, None, json.loads(v["segments"])
+    runs = json.loads(v["runs"])
+    by = defaultdict(list)
+    for _, _, who, said in runs:
+        by[who].append(said)
+    guests = {g: " ".join(t) for g, t in by.items() if g and g != slug and g in hermits}
+    segments = [{"start": a, "end": b, "who": who, "text": said} for a, b, who, said in runs]
+    return " ".join(by.get(slug, [])), guests, json.loads(v["airtime"]), segments
 
 
 def week_start(upload_dates: list[str]) -> str | None:
@@ -260,7 +293,8 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
                     finish(slug, transcripts, episodes, ep_words)
                 slug, transcripts, episodes, ep_words = v["hermit"], {}, {}, {}
             v["collections"] = [c for c in v["collections"] if c in colls and colls[c].wants("", v["upload_date"])]
-            raw = text.clean(v["text"])
+            said, guests, air, segments = split_speakers(v, slug, hermits)
+            raw = text.clean(said)
             toks = text.tokenize(raw)
             grams = text.ngram_index(toks, 3)
             lex = {}
@@ -286,22 +320,40 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
             if (v["upload_date"] or "") >= start:
                 recent.update(uni)
             ep_words[v["id"]] = (Counter({w: c for w, c in uni.items() if c >= 4}), sum(uni.values()))
+            # Other Hermits heard in the episode: their words and phrases count as theirs, and so do the names they say.
+            heard = {}
+            for g, gsaid in guests.items():
+                gt = text.tokenize(text.clean(gsaid))
+                gg = text.ngram_index(gt, 3)
+                gbi = Counter({" ".join(k): c for k, c in gg.items()
+                               if len(k) == 2 and text.interesting(k[0]) and text.interesting(k[1])})
+                gtri = Counter({" ".join(k): c for k, c in gg.items()
+                                if len(k) == 3 and text.interesting(k[0]) and text.interesting(k[2])})
+                words[g].update(w for w in gt if text.interesting(w))
+                bigrams[g].update(gbi)
+                trigrams[g].update(gtri)
+                totals[g] += len(gt)
+                spread[g].update(gbi.keys())
+                spread[g].update(gtri.keys())
+                heard[g] = {"w": len(gt), "m": dict(finder.count(gt, skip=g))}
 
-            segments = json.loads(v["segments"])
-            transcripts[v["id"]] = _chunks(segments)
+            transcripts[v["id"]] = _chunks(segments, slug if air is not None else None)
             episodes[v["id"]] = {"mt": mention_times(finder, segments, slug)}
             counts[coll.name][slug][v["source"]] += 1
             total.add(v["id"])
             dur = v["duration"] or 0
+            # Pace is the owner's words over the time others weren't talking.
+            own_secs = max(dur - sum(t for g, t in (air or {}).items() if g in guests), dur / 5)
             rows.append({
                 "id": v["id"], "h": slug, "c": v["collections"], "t": v["title"], "d": _date(v["upload_date"]),
                 "ts": v["timestamp"], "dur": round(dur), "v": v["view_count"], "l": v["like_count"],
                 "cm": v["comment_count"], "ep": episode_number(v["title"]), "src": v["source"], "a": v["added_at"],
                 "w": len(toks), "u": len(set(toks)), "r": text.mattr(toks),
-                "wpm": round(len(toks) / (dur / 60), 1) if dur else None,
-                "laugh": text.laughs(raw), "music": text.music_cues(raw),
+                "wpm": round(len(toks) / (own_secs / 60), 1) if dur else None,
+                "laugh": text.laughs(raw), "music": text.music_cues(text.clean(v["text"])),
                 "m": dict(spoken), "tm": title_mentions, "lex": lex,
                 "open": " ".join(toks[:14]), "close": " ".join(toks[-14:]),
+                **({"sp": {k: round(t) for k, t in air.items()}, "g": heard} if air is not None else {}),
             })
         if slug:
             finish(slug, transcripts, episodes, ep_words)
@@ -325,7 +377,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
                 if others else [],
             }}
             (base / "words" / f"{s}.json").write_text(json.dumps(doc, separators=(",", ":")))
-        present.update(words)
+        present.update(n_eps)          # their own episodes, not only heard in others'
         (base / "videos.json").write_text(json.dumps(rows, separators=(",", ":")))
         seasons.append({"name": coll.name, "slug": coll.slug, "series": coll.series})
         week[coll.name] = {"from": _date(start), "to": _date(max(dates)),

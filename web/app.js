@@ -484,16 +484,26 @@ function lexTotals(list, group) {
   return m;
 }
 
-function mentionsGiven(list) {
-  const m = {};
-  for (const v of list) for (const [k, c] of Object.entries(v.m)) m[k] = (m[k] || 0) + c;
+/** Every time one Hermit names another, as [speaker, named, times, episode]. Episodes split by voice ("g") also
+ *  say what other Hermits heard in them said; in the rest every word counts as the owner's. */
+function* namings(list) {
+  for (const v of list) {
+    for (const [k, c] of Object.entries(v.m)) yield [v.h, k, c, v];
+    for (const [by, x] of Object.entries(v.g || {})) for (const [k, c] of Object.entries(x.m)) yield [by, k, c, v];
+  }
+}
+
+/** Who these Hermits name, in anyone's episodes this season. */
+function mentionsBy(slugs) {
+  const m = {}, who = new Set(slugs);
+  for (const [by, k, c] of namings(collVids())) if (who.has(by)) m[k] = (m[k] || 0) + c;
   return m;
 }
 
 function hermitMetrics() {
   const g = byHermit(collVids()), out = {};
   const received = {};
-  for (const v of collVids()) for (const [k, c] of Object.entries(v.m)) received[k] = (received[k] || 0) + c;
+  for (const [, k, c] of namings(collVids())) received[k] = (received[k] || 0) + c;
   for (const [slug, list] of Object.entries(g)) {
     const secs = sum(list, v => v.dur), w = sum(list, v => v.w);
     const fill = sum(list, v => sum(Object.values(v.lex.Fillers || {}), x => x));
@@ -664,8 +674,8 @@ const TABS = {
     const all = collVids(), list = vids(), ps = present(), sel = new Set(state.sel);
     const g = byHermit(all);
     const hrs = Object.fromEntries(Object.entries(g).map(([s, l]) => [s, hours(sum(l, v => v.dur))]));
-    const pair = {};   // "a>b" -> mentions of b in a's videos
-    for (const v of all) for (const [k, c] of Object.entries(v.m)) if (H[k]) pair[v.h + '>' + k] = (pair[v.h + '>' + k] || 0) + c;
+    const pair = {};   // "a>b" -> times a names b (in a's episodes, or heard in someone else's)
+    for (const [by, k, c] of namings(all)) if (H[k] && H[by]) pair[by + '>' + k] = (pair[by + '>' + k] || 0) + c;
 
     card(el, { title: 'Who talks about whom', wide: true, height: 560,
       sub: 'Each Hermit’s three most-named connections (all of them for selected Hermits). Line thickness = how often the two name each other on camera; circle size = how often a Hermit is named. ' + (narrow() ? 'Tap to select.' : 'Drag to rearrange, click to select.'),
@@ -722,12 +732,12 @@ const TABS = {
     mode.onchange = () => { state.heat = mode.value; update(); };
     card(el, { title: 'Mention matrix', wide: true, tools: [mode],
       sub: narrow() ? `Who each Hermit names most in their episodes · ${state.heat === 'rate' ? 'mentions per hour of their footage' : 'total mentions'}`
-        : state.heat === 'rate' ? 'Row = whose episodes, column = who gets named · mentions per hour of the row Hermit’s footage'
-        : 'Row = whose episodes, column = who gets named · total mentions',
+        : state.heat === 'rate' ? 'Row = who’s talking, column = who gets named · mentions per hour of the row Hermit’s footage'
+        : 'Row = who’s talking, column = who gets named · total mentions',
       height: Math.max(260, scope().length * 26 + 110),
       build: () => {
         const rowsH = scope().filter(s => g[s]), cols = ps;
-        const tableSpec = { cols: [{ k: 'a', label: 'In episodes of' }, ...cols.map(b => ({ k: b, label: name(b), n: true }))],
+        const tableSpec = { cols: [{ k: 'a', label: 'Named by' }, ...cols.map(b => ({ k: b, label: name(b), n: true }))],
           rows: rowsH.map(a => Object.fromEntries([['a', name(a)], ...cols.map(b => [b, a === b ? null : pair[a + '>' + b] || 0])])) };
         if (narrow()) {      // too many columns for a phone: each Hermit's three most-named instead
           const val = (a, b) => state.heat === 'rate' ? (hrs[a] ? (pair[a + '>' + b] || 0) / hrs[a] : 0) : pair[a + '>' + b] || 0;
@@ -752,7 +762,7 @@ const TABS = {
             ...base(),
             grid: { left: 8, right: 16, top: 8, bottom: 56, containLabel: true },
             tooltip: { ...base().tooltip, formatter: p => tip(state.heat === 'rate' ? p.data[2].toFixed(2) + ' / hour' : full(p.data[2]),
-              `${name(cols[p.data[0]])} named in ${name(rowsH[p.data[1]])}’s episodes`, state.heat === 'rate' ? `<br>${full(p.data[3])} times in total` : '') },
+              `${name(cols[p.data[0]])} named by ${name(rowsH[p.data[1]])}`, state.heat === 'rate' ? `<br>${full(p.data[3])} times in total` : '') },
             xAxis: axis({ type: 'category', data: cols.map(name), splitArea: { show: false }, axisLabel: { color: css('--ink-2'), rotate: 45, interval: 0 }, axisLine: { show: false } }),
             yAxis: axis({ type: 'category', data: rowsH.map(name), inverse: true, axisLabel: { color: css('--ink-2') }, axisLine: { show: false } }),
             visualMap: { dimension: 2, min: 0, max: max || 1, calculable: false, orient: 'horizontal', left: 'center', bottom: 0, itemWidth: 10, itemHeight: 140,
@@ -801,9 +811,9 @@ const TABS = {
         } });
     }
 
-    const given = mentionsGiven(list);
+    const given = mentionsBy(scope());
     card(el, { title: state.sel.length ? `Who ${state.sel.length === 1 ? name(state.sel[0]) + ' talks' : 'they talk'} about` : 'Who gets talked about most',
-      sub: state.sel.length ? 'Times each Hermit is named in the selected episodes' : 'Times each Hermit is named in someone else’s episodes',
+      sub: state.sel.length ? 'Times each Hermit is named by the selected Hermits' : 'Times each Hermit is named by someone else',
       build: () => hbar(Object.entries(given).filter(([s]) => H[s]).map(([s, value]) => ({ name: name(s), slug: s, value })), { unit: 'mentions' }) });
     if (state.sel.length) {
       card(el, { title: `Who talks about ${state.sel.length === 1 ? name(state.sel[0]) : 'them'}`,
@@ -822,6 +832,18 @@ const TABS = {
         }
         return weekly(list, perHermitSeries(list, l => countByWeek(l, v => sum(Object.values(v.m), x => x)), 'Mentions'));
       } });
+    const split = all.filter(v => v.sp);
+    if (split.length) {
+      const heard = {};   // "guest>host" -> [seconds the guest talks in the host's episodes, episodes]
+      for (const v of split) for (const [k, t] of Object.entries(v.sp))
+        if (k !== v.h && H[k] && t >= 20) { const x = heard[k + '>' + v.h] ??= [0, 0]; x[0] += t; x[1]++; }
+      card(el, { title: state.sel.length ? `Where ${state.sel.length === 1 ? name(state.sel[0]) + ' is' : 'they are'} heard, and who’s heard with them` : 'Heard in each other’s episodes',
+        sub: `Minutes one Hermit talks in another’s episodes, told apart by their voices · ${full(split.length)} of ${full(all.length)} episodes split by voice so far`,
+        build: () => hbar(Object.entries(heard).filter(([k]) => !sel.size || k.split('>').some(s => sel.has(s))).map(([k, [t, n]]) => {
+          const [a, b] = k.split('>');
+          return { name: `${name(a)} in ${name(b)}’s`, slug: a, value: Math.round(t / 60), extra: `<br>in ${n} episode${n === 1 ? '' : 's'}` };
+        }), { unit: 'minutes', labelWidth: 200 }) });
+    }
     card(el, { title: 'Named in episode titles', sub: 'Episodes whose title names another Hermit — usually a collab or a prank',
       build: () => {
         const c = {};
@@ -934,7 +956,10 @@ const TABS = {
     $('#search-examples').hidden = !!phrases.length;
     searchBusy(null);
     if (!phrases.length) return catchphraseBoard(token);
-    const list = vids(), slugs = [...new Set(list.map(v => v.h))];
+    // The selected Hermits' episodes, and others' episodes they're heard in (once those are split by voice).
+    const sc = new Set(scope());
+    const list = collVids().filter(v => sc.has(v.h) || Object.keys(v.sp || {}).some(s => sc.has(s)));
+    const slugs = [...new Set(list.map(v => v.h))];
     let loaded = 0;
     const progress = () => searchBusy(loaded < slugs.length
       ? `Loading transcripts… ${loaded} of ${slugs.length} ${people()}` : `Searching ${full(list.length)} episodes…`);
@@ -956,24 +981,25 @@ const TABS = {
     if (!el) return;
     searchBusy(null);
     const labels = phrases.map(p => p.join(' '));
-    const hits = [];       // {v, start, text, p}
-    const perVideo = phrases.map(() => new Map());
+    const hits = [];       // {v, start, text, i, who, n}: `who` said it, in v's episode
+    const said = phrases.map(() => ({}));     // per phrase: speaker -> times
     for (const v of list) {
-      for (const [start, text] of docs[v.h]?.[v.id] || []) {
+      for (const [start, text, who = v.h] of docs[v.h]?.[v.id] || []) {
+        if (!sc.has(who)) continue;
         const toks = tokenize(text);
         phrases.forEach((p, i) => {
           const n = countPhrase(toks, p);
-          if (n) { perVideo[i].set(v, (perVideo[i].get(v) || 0) + n); hits.push({ v, start, text, i }); }
+          if (n) { said[i][who] = (said[i][who] || 0) + n; hits.push({ v, start, text, i, who, n }); }
         });
       }
     }
     const pcolor = i => css(`--s${i + 1}`);
     card(el, { title: 'Times said, by Hermit', sub: phrases.length > 1 ? labels.map(l => `“${l}”`).join(' · ') : `“${labels[0]}” · per hour of footage in the table`,
       build: () => {
-        const g = byHermit(list);
-        const rows = Object.keys(g).map(s => {
-          const r = { name: name(s), slug: s, hours: hours(sum(g[s], v => v.dur)) };
-          phrases.forEach((_, i) => { r['p' + i] = sum(g[s], v => perVideo[i].get(v) || 0); r['r' + i] = r.hours ? r['p' + i] / r.hours : 0; });
+        const g = byHermit(collVids());
+        const rows = [...sc].map(s => {
+          const r = { name: name(s), slug: s, hours: hours(sum(g[s] || [], v => v.dur)) };
+          phrases.forEach((_, i) => { r['p' + i] = said[i][s] || 0; r['r' + i] = r.hours ? r['p' + i] / r.hours : 0; });
           return r;
         }).filter(r => phrases.some((_, i) => r['p' + i])).sort((a, b) => b.p0 - a.p0 || (b.p1 || 0) - (a.p1 || 0));
         if (!rows.length) return { empty: 'Not said in the selected episodes.' };
@@ -996,7 +1022,7 @@ const TABS = {
         };
       } });
     card(el, { title: 'Over the season', sub: 'Times said per week',
-      build: () => weekly(list, phrases.map((_, i) => ({ name: labels[i], color: phrases.length > 1 ? pcolor(i) : css('--s1'), data: countByWeek([...perVideo[i].keys()], v => perVideo[i].get(v)) })), { type: phrases.length > 1 ? 'line' : 'bar' }) });
+      build: () => weekly(list, phrases.map((_, i) => ({ name: labels[i], color: phrases.length > 1 ? pcolor(i) : css('--s1'), data: countByWeek(hits.filter(h => h.i === i).map(h => ({ d: h.v.d, n: h.n })), x => x.n) })), { type: phrases.length > 1 ? 'line' : 'bar' }) });
     card(el, { title: 'Every moment', wide: true, sub: `${full(hits.length)} moments${hits.length > 400 ? ' · newest 400 shown' : ''} · click a time to jump straight to it`,
       build: () => {
         if (!hits.length) return { empty: 'Not said in the selected episodes.' };
@@ -1013,7 +1039,7 @@ const TABS = {
           a.textContent = clock(h.start);
           const ep = document.createElement('a');
           ep.href = epHref(h.v.id); ep.textContent = h.v.t; ep.className = 'ep-link';
-          meta.append(`${H[h.v.h].short} · ${h.v.d} · `, a, ' · ', ep);
+          meta.append(`${H[h.who].short}${h.who !== h.v.h ? ` in ${H[h.v.h].short}’s episode` : ''} · ${h.v.d} · `, a, ' · ', ep);
           const p = document.createElement('div');
           p.innerHTML = highlight(excerpt(h.text, phrases[h.i]), phrases[h.i]);
           li.append(meta, p);
@@ -1046,22 +1072,22 @@ function whatsNew() {
   eps = [...eps].sort(byNewest);
 
   // First episode of the season where one Hermit names another (twice or more: one could be a mishearing).
-  const first = {};
-  for (const v of [...collVids()].sort((a, b) => byNewest(b, a)))
-    for (const [k, c] of Object.entries(v.m)) if (H[k] && c >= 2) first[v.h + '>' + k] ??= v;
+  const first = {};     // "a>b" -> [episode, times]
+  for (const [by, k, c, v] of namings([...collVids()].sort((a, b) => byNewest(b, a))))
+    if (H[k] && H[by] && c >= 2) first[by + '>' + k] ??= [v, c];
   const sc = new Set(scope());
-  const firsts = Object.entries(first).filter(([k, v]) => v.d && v.d >= from && (sc.has(v.h) || sc.has(k.split('>')[1])))
-    .sort((a, b) => byNewest(a[1], b[1])).slice(0, 8);
+  const firsts = Object.entries(first).filter(([k, [v]]) => v.d && v.d >= from && k.split('>').some(s => sc.has(s)))
+    .sort((a, b) => byNewest(a[1][0], b[1][0])).slice(0, 8);
 
   const face = s => H[s]?.avatar ? `<img src="${esc(H[s].avatar)}" alt="" loading="lazy">` : '<span class="dot"></span>';
   const epList = eps.length ? `<ul class="news-list">${eps.slice(0, 8).map(v => `<li>${face(v.h)}<div><a href="${esc(epHref(v.id))}">${esc(v.t)}</a>
       <div class="muted small">${esc(name(v.h))} · ${esc(longDate(v.d))}</div></div></li>`).join('')}</ul>
       ${eps.length > 8 ? `<a class="small" href="${esc(hashFor({ tab: 'videos', ep: null }))}">and ${eps.length - 8} more in Videos</a>` : ''}`
     : `<p class="muted small">No episodes from the selected ${people()} in this stretch.</p>`;
-  const pairList = firsts.length ? `<ul class="news-list">${firsts.map(([k, v]) => {
-      const b = k.split('>')[1];
-      return `<li>${face(v.h)}<div>${esc(name(v.h))} talks about ${esc(name(b))} <span class="muted">(${v.m[b]} times)</span>
-        <div class="muted small"><a href="${esc(epHref(v.id))}">${esc(longDate(v.d))}</a></div></div></li>`;
+  const pairList = firsts.length ? `<ul class="news-list">${firsts.map(([k, [v, c]]) => {
+      const [a, b] = k.split('>');
+      return `<li>${face(a)}<div>${esc(name(a))} talks about ${esc(name(b))} <span class="muted">(${c} times)</span>
+        <div class="muted small"><a href="${esc(epHref(v.id))}">${esc(longDate(v.d))}</a>${a !== v.h ? ` · in ${esc(name(v.h))}’s episode` : ''}</div></div></li>`;
     }).join('')}</ul>` : '<p class="muted small">No new pairs in this stretch.</p>';
   const ww = wk?.words?.length ? `<div class="phrases">${wk.words.map(([w, , c]) => `<a class="w" href="${esc(searchHref(w))}" title="said ${c} times that week">${esc(w)}</a>`).join('')}</div>
       <p class="muted small">Said far more from ${esc(longDate(wk.from))} to ${esc(longDate(wk.to))} than earlier in the season, by all ${people()} · click one to search it</p>`
@@ -1225,9 +1251,9 @@ function shareCard(slug, doc, img) {
   const m = hermitMetrics()[slug], all = collVids();
   const top = c => { const e = Object.entries(c).filter(([s, n]) => H[s] && s !== slug && n > 0).sort((a, b) => b[1] - a[1])[0]; return e ? `${name(e[0])} (${full(e[1])} times)` : null; };
   const by = {};
-  for (const v of all) if (v.h !== slug && v.m[slug]) by[v.h] = (by[v.h] || 0) + v.m[slug];
+  for (const [who, k, c] of namings(all)) if (k === slug && who !== slug) by[who] = (by[who] || 0) + c;
   const facts = [['Signature word', doc?.x?.[0]?.[0]], ['Catchphrase', doc?.p?.[0] ? `“${doc.p[0][0]}”` : null],
-    ['Talks about most', top(mentionsGiven(all.filter(v => v.h === slug)))], ['Most talked about by', top(by)]].filter(f => f[1]);
+    ['Talks about most', top(mentionsBy([slug]))], ['Most talked about by', top(by)]].filter(f => f[1]);
   const stats = [[fmt(m.videos), 'episodes'], [fmt(Math.round(m.hours)), 'hours of footage'], [fmt(m.words), 'words spoken'], [m.wpm ? m.wpm.toFixed(0) : '—', 'words a minute']];
 
   const W = 1200, HT = 630, F = 'system-ui, -apple-system, "Segoe UI", sans-serif';
@@ -1326,7 +1352,8 @@ async function episodePage(token) {
     return tileHTML(k, val == null ? '—' : show(val), cmp ? `<div class="cmp small muted" title="${esc(h.short)}’s average this season: ${esc(usual == null ? '—' : show(usual))}">${esc(cmp)}</div>` : '');
   }).join('');
 
-  card(el, { title: 'Who’s named, and when', wide: true, sub: 'Each dot is a time another Hermit is named · click one to watch from there',
+  card(el, { title: 'Who’s named, and when', wide: true, sub: 'Each dot is a time another Hermit is named · click one to watch from there' +
+      (extra.mt.some(m => m[2]) ? ` · dots in the second colour: named by someone other than ${h.short}` : ''),
     build: () => {
       const counts = {};
       for (const [, s] of extra.mt) if (H[s]) counts[s] = (counts[s] || 0) + 1;
@@ -1338,17 +1365,23 @@ async function episodePage(token) {
         option: {
           ...base(),
           grid: { ...base().grid, right: 24, bottom: 24 },
-          tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(name(p.data.s), `at ${clock(p.data.t)}`) },
+          tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(name(p.data.s), `at ${clock(p.data.t)}`,
+            p.data.by ? `<br>named by ${esc(H[p.data.by] ? name(p.data.by) : 'an unknown voice')}` : '') },
           xAxis: axis({ type: 'value', min: 0, max: Math.ceil(mins), name: 'minutes', nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: css('--muted') } }),
           yAxis: axis({ type: 'category', inverse: true, data: cats.map(s => `${name(s)} (${counts[s]})`), axisLine: { show: false }, axisLabel: { color: css('--ink-2') }, splitLine: { show: true, lineStyle: { color: css('--grid') } } }),
           series: [{ type: 'scatter', symbolSize: 10, itemStyle: { color: css('--s1'), opacity: 0.8, borderColor: css('--surface'), borderWidth: 1.5 },
-            data: pts.map(([t, s]) => ({ value: [+(t / 60).toFixed(2), cats.indexOf(s)], t, s })) }],
+            data: pts.map(([t, s, by]) => ({ value: [+(t / 60).toFixed(2), cats.indexOf(s)], t, s, by,
+              itemStyle: by ? { color: css('--s2') } : undefined })) }],
         },
         onClick: p => window.open(ytUrl(v.id, p.data.t), '_blank', 'noopener'),
         table: { cols: [{ k: 'name', label: 'Hermit' }, { k: 'n', label: 'Times named', n: true }, { k: 'first', label: 'First at' }, { k: 'last', label: 'Last at' }],
           rows: cats.map(s => { const ts = pts.filter(p => p[1] === s).map(p => p[0]); return { name: name(s), n: counts[s], first: clock(ts[0]), last: clock(ts[ts.length - 1]) }; }) },
       };
     } });
+
+  if (v.sp) card(el, { title: 'Who’s talking', sub: 'Minutes of speech by each voice, told apart by how they sound · unknown: a voice that matched no Hermit (a guest, music, a mob) or too short to tell',
+    build: () => hbar(Object.entries(v.sp).map(([s, t]) => ({ name: H[s] ? name(s) : 'Unknown voice', slug: H[s] ? s : null, value: +(t / 60).toFixed(1) })),
+      { unit: 'minutes', decimals: 1, onSlug: false }) });
 
   card(el, { title: 'Pace through the episode', sub: `Words per minute, two minutes at a time · dashed line: ${h.short}’s average this season`,
     build: () => {
@@ -1379,16 +1412,24 @@ async function episodePage(token) {
           rows: extra.x.map(([w, z, c]) => ({ w, z, c })) } };
     } });
 
-  card(el, { title: 'Transcript', wide: true, sub: `${src[0].toUpperCase() + src.slice(1)}, in 20-second stretches · click a time to watch from there`,
+  card(el, { title: 'Transcript', wide: true, sub: `${src[0].toUpperCase() + src.slice(1)}, in 20-second stretches${v.sp ? ', named by who’s talking' : ''} · click a time to watch from there`,
     build: () => {
       if (!chunks.length) return null;
       const ul = document.createElement('ul');
       ul.className = 'kwic transcript';
-      for (const [t, text] of chunks) {
+      let prev = v.h;
+      for (const [t, text, who = v.h] of chunks) {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = ytUrl(v.id, t); a.target = '_blank'; a.rel = 'noopener'; a.textContent = clock(t); a.className = 'meta';
-        li.append(a, ' ', text);
+        li.append(a, ' ');
+        if (who !== prev) {      // name the voice whenever it changes
+          const b = document.createElement('b');
+          b.textContent = (H[who] ? name(who) : 'Unknown voice') + ': ';
+          li.append(b);
+          prev = who;
+        }
+        li.append(text);
         ul.appendChild(li);
       }
       return { node: pageList(ul, 60) };

@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS collection_videos (
     via        TEXT NOT NULL,
     PRIMARY KEY (collection, video_id)
 );
+-- Who said what in an episode (speakers.py): the captions as [start, end, speaker slug or null, text] runs, and
+-- seconds of speech per voice ('?' for unknown). Episodes without a row count every word as the owner's.
+CREATE TABLE IF NOT EXISTS speech (
+    video_id    TEXT PRIMARY KEY REFERENCES videos(id),
+    runs        TEXT NOT NULL,
+    airtime     TEXT NOT NULL,
+    labelled_at INTEGER
+);
 -- Small facts about the last runs ('last_sync' -> JSON), shown on the site's status page.
 CREATE TABLE IF NOT EXISTS kv (
     key   TEXT PRIMARY KEY,
@@ -133,6 +141,11 @@ def save_transcript(conn, video_id: str, source: str, language: str | None, segm
     set_error(conn, video_id, None)
 
 
+def save_speech(conn, video_id: str, runs: list, airtime: dict) -> None:
+    conn.execute("INSERT OR REPLACE INTO speech (video_id, runs, airtime, labelled_at) VALUES (?, ?, ?, ?)",
+                 (video_id, json.dumps(runs, separators=(",", ":")), json.dumps(airtime), int(time.time())))
+
+
 def set_error(conn, video_id: str, error: str | None) -> None:
     """Why a video still has no transcript ('whisper-wait', 'no-transcript', or the fetch error); None clears it."""
     conn.execute("UPDATE videos SET error = ?, error_at = ? WHERE id = ?",
@@ -169,14 +182,15 @@ def untried(conn, collection: str) -> int:
 
 
 def analysable(conn, collection: str):
-    """The collection's transcribed videos with their hermit slug and every collection they're in, one hermit
-    after another. A generator: a season's transcripts are never all in memory at once."""
+    """The collection's transcribed videos with their hermit slug, who said what when that's known (`runs`,
+    `airtime`: see the speech table), and every collection they're in, one hermit after another. A generator: a season's transcripts are never all in memory at once."""
     for r in conn.execute(
-        """SELECT v.*, c.hermit, t.source, t.text, t.segments, t.added_at,
+        """SELECT v.*, c.hermit, t.source, t.text, t.segments, t.added_at, s.runs, s.airtime,
                   (SELECT GROUP_CONCAT(collection, '|') FROM collection_videos WHERE video_id = v.id) AS collections
            FROM videos v
            JOIN channels c ON c.id = v.channel
            JOIN transcripts t ON t.video_id = v.id
+           LEFT JOIN speech s ON s.video_id = v.id
            WHERE c.hermit IS NOT NULL AND v.id IN (SELECT video_id FROM collection_videos WHERE collection = ?)
            ORDER BY c.hermit, v.upload_date, v.timestamp""", (collection,)):
         d = dict(r)

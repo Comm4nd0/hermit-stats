@@ -492,3 +492,72 @@ def test_someone_elses_video_in_a_hermits_playlist_is_not_theirs(tmp_path, monke
     cfg = Config([Collection("Season 11", pattern, None)], [jevin], None, None, ["thehermitcraftarchive"])
     cli._discover(conn, cfg, jevin, None)
     assert sorted(r[0] for r in conn.execute("SELECT video_id FROM collection_videos")) == ["arch", "ep", "old"]
+
+
+# ---------------------------------------------------------------- who's speaking
+
+def test_other_hermits_heard_in_an_episode_get_their_own_words_and_mentions(tmp_path):
+    hermits = HERMITS[1:3]
+    cfg = Config([Collection("Season 11", re.compile("x"), None, None, "20251101")], hermits, None, None)
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_channel(conn, "UCm", "mumbo-jumbo", "Mumbo", hermits[0].url, None)
+    db.upsert_channel(conn, "UCg", "grian", "Grian", hermits[1].url, None)
+    _video(conn, "m1", "UCm", "Hermitcraft 11 Ep 1", "20261001", ["redstone redstone", "grian help me"] * 5)
+    _video(conn, "g1", "UCg", "Hermitcraft 11 Ep 1", "20261001", ["concrete concrete", "mumbo come here"] * 5)
+    # In Grian's episode Mumbo talks too (and names Grian), and a voice nobody knows says something.
+    db.save_speech(conn, "g1", [[0, 9, "grian", "concrete concrete mumbo come here"],
+                                [10, 19, "mumbo-jumbo", "grian look at this redstone"],
+                                [20, 25, None, "buy our merch"]],
+                   {"grian": 300, "mumbo-jumbo": 60, "?": 5})
+    conn.commit()
+    out = tmp_path / "site"
+    build.build(conn, cfg, out, log=lambda *a: None)
+    season = out / "data" / "season-11"
+    videos = {v["id"]: v for v in json.loads((season / "videos.json").read_text())}
+    g1 = videos["g1"]
+    assert g1["w"] == 5 and g1["m"] == {"mumbo-jumbo": 1}                 # only Grian's own words
+    assert g1["g"] == {"mumbo-jumbo": {"w": 5, "m": {"grian": 1}}}
+    assert g1["sp"] == {"grian": 300, "mumbo-jumbo": 60, "?": 5}
+    assert "sp" not in videos["m1"] and videos["m1"]["w"] == 25           # no voice data: as before
+    mumbo = json.loads((season / "words" / "mumbo-jumbo.json").read_text())["Season 11"]
+    assert mumbo["n"] == 25 + 5 and dict(mumbo["w"])["redstone"] == 11
+    grian = json.loads((season / "words" / "grian.json").read_text())["Season 11"]
+    assert "merch" not in dict(grian["w"])
+    chunks = json.loads((season / "transcripts" / "grian.json").read_text())["g1"]
+    assert chunks == [[0, "concrete concrete mumbo come here"], [10, "grian look at this redstone", "mumbo-jumbo"],
+                      [20, "buy our merch", "?"]]
+    mt = json.loads((season / "episodes" / "grian.json").read_text())["g1"]["mt"]
+    assert mt == [[0, "mumbo-jumbo"], [10, "grian", "mumbo-jumbo"]]
+
+
+def test_caption_words_keep_their_times():
+    from hermitstats import speakers
+    data = {"events": [{"tStartMs": 1000, "dDurationMs": 3000, "segs": [{"utf8": "hello"}, {"utf8": " there", "tOffsetMs": 500}]},
+                       {"tStartMs": 4000, "segs": [{"utf8": "\n"}]},
+                       {"tStartMs": 5000, "dDurationMs": 2000, "segs": [{"utf8": "a manual line"}]}]}
+    assert speakers.caption_words(data) == [[1.0, "hello"], [1.5, "there"], [5.0, "a"], [5.67, "manual"], [6.33, "line"]]
+
+
+def test_words_go_to_the_voice_speaking_and_runs_join_up():
+    import numpy as np
+    from hermitstats import speakers
+    times = np.array([[0, 1.5], [0.75, 2.25], [1.5, 3.0], [10, 11.5]])
+    labels = ["grian", "grian", "mumbo-jumbo", None]
+    words = [[0.5, "hi"], [1.2, "there"], [2.4, "oi"], [10.6, "merch"], [30, "outro"]]
+    assert speakers.attribute(words, times, labels, "grian") == [
+        [0.5, 1.2, "grian", "hi there"], [2.4, 2.4, "mumbo-jumbo", "oi"], [10.6, 10.6, None, "merch"],
+        [30, 30, "grian", "outro"]]      # nothing heard near it: the owner's, as without voice data
+    assert speakers.airtime(times, labels) == {"grian": 1.5, "mumbo-jumbo": 0.8, "?": 0.8}
+
+
+def test_windows_go_to_the_nearest_voiceprint_or_nobody():
+    import numpy as np
+    from hermitstats import speakers
+    a, b, c = np.eye(3)
+    prints = {"grian": a, "mumbo-jumbo": b}
+    embs = np.stack([a] * 6 + [b] * 6 + [c] * 6)
+    labels = speakers.label(embs, prints, "grian")     # smoothing lets a voice run on by a window at most
+    assert labels[:5] == ["grian"] * 5 and labels[7:12] == ["mumbo-jumbo"] * 5 and labels[13:] == [None] * 5
+    # the densest part of an owner's windows is them, however much a guest talks
+    own = np.stack([a] * 30 + [b] * 10 + [c] * 5) + np.random.default_rng(0).normal(0, 0.05, (45, 3))
+    assert speakers.voiceprint(own / np.linalg.norm(own, axis=1, keepdims=True)) @ a > 0.99

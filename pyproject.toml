@@ -14,6 +14,7 @@ dependencies = [
     # ctranslate2 is built against CUDA 12; ship its libs so a CUDA 13 system still works
     "nvidia-cublas-cu12; sys_platform == 'linux'",
     "nvidia-cudnn-cu12>=9,<10; sys_platform == 'linux'",
+    "kaldi-native-fbank>=1.22.4",
 ]
 
 [project.optional-dependencies]

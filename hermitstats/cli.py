@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 import webbrowser
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from pathlib import Path
 
 from rich.console import Console
@@ -21,7 +21,7 @@ from rich.table import Table
 
 from . import build as builder
 from . import config as configmod
-from . import db, youtube
+from . import db, speakers, youtube
 from .transcribe import Whisper, from_captions
 
 console = Console()
@@ -281,6 +281,81 @@ def _record_sync(conn, run: dict) -> None:
     conn.commit()
 
 
+# ---------------------------------------------------------------- voices
+
+def cmd_voices(args) -> int:
+    """Download each episode's audio, voiceprint it, then work out who said what (see speakers.py)."""
+    cfg = _cfg(args)
+    unknown = set(args.season) - {c.name for c in cfg.collections}
+    if unknown:
+        console.print(f"[red]No such season: {', '.join(sorted(unknown))}[/]")
+        return 1
+    conn = db.connect(args.db)
+    voices = speakers.Voices(args.cache)
+    episodes = {}
+    for coll in (c for c in cfg.collections if c.name in args.season):
+        for r in conn.execute(
+                """SELECT v.id, v.title, v.duration, v.upload_date, c.hermit, t.source, t.language
+                   FROM collection_videos cv JOIN videos v ON v.id = cv.video_id JOIN channels c ON c.id = v.channel
+                   JOIN transcripts t ON t.video_id = v.id
+                   WHERE cv.collection = ? AND c.hermit IS NOT NULL ORDER BY v.upload_date DESC""", (coll.name,)):
+            if coll.wants("", r["upload_date"]) and not coll.stream(r["title"], r["duration"]):
+                episodes[r["id"]] = dict(r)
+    todo = [] if args.relabel else [v for v in episodes.values() if not voices.has(v["id"]) and v["source"] != "whisper"]
+    if args.limit:
+        todo = todo[:args.limit]
+    console.print(f"[bold]{len(episodes)}[/] episodes, {len(todo)} still to voiceprint "
+                  f"({sum(v['duration'] or 0 for v in todo) / 3600:.0f} h of audio)")
+
+    def fetch(v):
+        time.sleep(random.uniform(*args.pause))
+        return voices.download(v["id"], v["source"], v["language"], _cookies(args))
+
+    started, done, failed, bot = time.time(), 0, 0, 0
+    progress = Progress(TextColumn("{task.description}"), BarColumn(), MofNCompleteColumn(),
+                        TimeElapsedColumn(), console=console)
+    with progress, ThreadPoolExecutor(args.workers) as pool:
+        task = progress.add_task("Voiceprinting", total=len(todo))
+        queue, running = iter(todo), {}
+        while True:
+            # Only a few downloads ahead of the embedding, so audio files don't pile up on disk.
+            while len(running) < args.workers + 1 and not (args.hours and time.time() > started + args.hours * 3600):
+                v = next(queue, None)
+                if v is None:
+                    break
+                running[pool.submit(fetch, v)] = v
+            if not running:
+                break
+            finished, _ = wait(running, return_when=FIRST_COMPLETED)
+            for fut in finished:
+                v = running.pop(fut)
+                progress.update(task, description=f"[dim]{(v['title'] or v['id'])[:50]}")
+                try:
+                    path, words = fut.result()
+                    try:
+                        voices.embed(v["id"], path, words)
+                    finally:
+                        path.unlink(missing_ok=True)
+                    done += 1
+                    bot = 0
+                except Exception as e:
+                    failed += 1
+                    msg = str(e).splitlines()[0]
+                    progress.console.print(f"[red]failed[/] {v['id']}: {msg[:150]}")
+                    bot = bot + 1 if "not a bot" in msg else 0
+                progress.advance(task)
+            if bot >= 5:
+                for f in running:
+                    f.cancel()
+                progress.console.print("\n[red bold]YouTube is bot-checking this IP.[/] Stopped early; "
+                                       "what's done is kept. Re-run later, or add [bold]--cookies-from-browser[/].")
+                break
+    console.print(f"[green]{done}[/] voiceprinted, [red]{failed}[/] failed")
+    n = speakers.relabel(conn, voices, list(episodes.values()), log=console.print)
+    console.print(f"Who said what: [bold]{n}[/] episodes labelled. Next: [bold]hermit-stats build[/]")
+    return 0
+
+
 # ---------------------------------------------------------------- import
 
 def cmd_import(args) -> int:
@@ -423,6 +498,19 @@ def main(argv=None) -> int:
     s = sub.add_parser("sync", help="find each Hermit's season videos and transcribe new ones")
     sync_args(s)
     s.set_defaults(fn=cmd_sync)
+
+    s = sub.add_parser("voices", help="work out who's speaking in each episode, from the audio")
+    s.add_argument("season", nargs="+", help="seasons to do, e.g. \"Season 11\"")
+    s.add_argument("--relabel", action="store_true", help="only redo who's who from the voiceprints already made")
+    s.add_argument("--limit", type=int, help="voiceprint at most N episodes this run")
+    s.add_argument("--hours", type=float, metavar="H", help="stop starting new downloads after H hours")
+    s.add_argument("--workers", type=int, default=2, help="parallel audio downloads (default 2)")
+    s.add_argument("--pause", type=float, nargs=2, default=(1.0, 3.0), metavar=("MIN", "MAX"),
+                   help="random pause in seconds before each download (default 1 3)")
+    s.add_argument("--cache", type=Path, default=Path("cache"), help="audio, model and voiceprint dir")
+    s.add_argument("--cookies-from-browser", metavar="BROWSER")
+    s.add_argument("--cookies", type=Path, metavar="FILE")
+    s.set_defaults(fn=cmd_voices)
 
     s = sub.add_parser("import-ytlex", help="seed the database from a ytlex database")
     s.add_argument("source", type=Path)

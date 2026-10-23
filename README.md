@@ -44,6 +44,16 @@ fetching from the server wouldn't work anyway.
 - `site/data/`: `videos.json` (one row per episode), `words/` and `transcripts/` and `episodes/` (one file per
   Hermit, loaded when needed), `meta.json`, `status.json`.
 - A **mention** is another Hermit's name (or alias) spoken in an episode; the speaker's own name isn't counted.
+- **Who's talking.** Captions don't say, so by default every word in an episode counts as the channel owner's.
+  `hermit-stats voices "Season 11"` fixes that from the audio (`speakers.py`): Silero VAD finds the speech, each
+  1.5 s window gets a voiceprint (WeSpeaker ResNet34, an open ONNX model, no account needed), and each Hermit's
+  voiceprint is the densest part of their windows across their own episodes, where they're nearly always the
+  main voice. Every window is matched to the nearest Hermit (or left unknown), and the caption words, re-fetched
+  with per-word times, are split where the voice changes. The `speech` table holds the result; the build then
+  credits words, phrases, mentions and search hits to whoever said them, and episodes without a row work as
+  before. It's CPU work (~80x realtime on 32 cores, ~40 s an episode with the download), so it runs on the
+  desktop, not CT 112; windows and word times stay in `cache/voices/`, so `voices --relabel` redoes who's who
+  without YouTube.
   Auto-captions mishear names, so counts are close, not exact.
 
 ## Usage
@@ -58,6 +68,7 @@ uv run hermit-stats update            # all three: sync, build, push
 uv run hermit-stats status            # videos / transcripts per Hermit
 uv run hermit-stats sync Grian Mumbo  # just some Hermits
 uv run hermit-stats import-ytlex ../ytlex/ytlex.db   # one-off: reuse ytlex transcripts
+uv run hermit-stats voices "Season 11"   # who's talking, from the audio (hours; resumable)
 uv run --extra dev pytest             # tests
 ```
 
@@ -87,6 +98,16 @@ Each run re-lists every Hermit's season playlists and also title-matches their 3
 episode that hasn't been added to the playlist yet is still picked up. Videos that failed (premiere not
 started, members-only for now) are retried on the next run. Only one machine should run the timer: the
 database is the source of truth.
+
+`voices` runs on the desktop against a copy of CT 112's database, so its `speech` rows are copied back by hand
+(only that table; everything else stays CT 112's):
+
+```sh
+sqlite3 hermit-stats.db ".mode insert speech" "SELECT * FROM speech" | sed 's/^INSERT INTO/INSERT OR REPLACE INTO/' > speech.sql
+# on CT 112:  sqlite3 hermit-stats.db < speech.sql
+```
+
+Episodes uploaded after a `voices` run count every word as the owner's until the next one.
 
 ## Server
 

@@ -359,6 +359,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "faster-whisper" },
+    { name = "kaldi-native-fbank" },
     { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cudnn-cu12", marker = "sys_platform == 'linux'" },
     { name = "rich" },
@@ -373,6 +374,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "faster-whisper", specifier = ">=1.1" },
+    { name = "kaldi-native-fbank", specifier = ">=1.22.4" },
     { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cudnn-cu12", marker = "sys_platform == 'linux'", specifier = ">=9,<10" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
@@ -472,6 +474,38 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/01/e1/2069291243c926a2ff1cd706c7f3eeb9b62144bf60f77c9fb9ff2fb26bd3/iniconfig-2.3.1.tar.gz", hash = "sha256:67f4b9c50da0dedf52af349e7749a80a9057a5031199791b906c3bb3ae878960", size = 21209, upload-time = "2026-10-06T22:48:38.076Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/43/4ca9e49d27a1fcf6bece6f6aec0ea46bb9112489b93d4b688fb415457bdb/iniconfig-2.3.1-py3-none-any.whl", hash = "sha256:9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7", size = 7552, upload-time = "2026-10-06T22:48:36.959Z" },
+]
+
+[[package]]
+name = "kaldi-native-fbank"
+version = "1.22.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/74/eeb96eb1dbde3d77a5300d4a7c2f97733ffeb1a9da1435cd944712b750a4/kaldi_native_fbank-1.22.4.tar.gz", hash = "sha256:387a25a2114c9cc63e51a40705ae73d3546546fb3a07683357051048939dadcd", size = 71995, upload-time = "2026-10-21T06:00:47.417Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/b3/465ac25be5b117aefbed6e712d34310b912744f4bc564af7c16e68eddbdc/kaldi_native_fbank-1.22.4-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:0da90558fd9d37d8c03f5354cd566165ec1acb21057a3d553623749386be3a25", size = 243620, upload-time = "2026-10-21T04:30:30.341Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/09/a327f6ddae2dad5048bc2c530006812183d33701450826be201e6041d6b5/kaldi_native_fbank-1.22.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:895c69e73a0f2a30912268c9e517182d5451878fce3b26813a0017c604d6bb3d", size = 228952, upload-time = "2026-10-21T04:26:53.59Z" },
+    { url = "https://files.pythonhosted.org/packages/16/e7/52a4364a261ee7453d394d4dc904cda669e2969f8ecf94825afda63406e4/kaldi_native_fbank-1.22.4-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:f26cde9ffd76e7e4afe03a591bdfcae46ddf546127a4066ff46fef82e53a94c2", size = 299302, upload-time = "2026-10-21T02:48:22.035Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/d4/705e0194938799a77ee8783f992ae98ba13bd5e4adfa3ad9cbb316580b2e/kaldi_native_fbank-1.22.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:f3fd5be5e34c7ddd7b59737abbbf5fa89a9db921ac764d7784b520fd30f5649f", size = 322306, upload-time = "2026-10-21T02:48:15.678Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/dd/bfd5fa37c69e7b77470464b6e100ed36ec2eda652e69b71a6aeb6ff3d6b1/kaldi_native_fbank-1.22.4-cp311-cp311-manylinux_2_34_armv7l.manylinux_2_35_armv7l.whl", hash = "sha256:79bd0e9b1f35a5137b3548f6cb4ab9d4d2ac420618ec51595dad668c7165b046", size = 238126, upload-time = "2026-10-21T06:38:12.304Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/ee/fc03235e69b3c93923692e51f34395943da347d0391099b9a99071b91c74/kaldi_native_fbank-1.22.4-cp311-cp311-win32.whl", hash = "sha256:31651780102c8d88e43a2705623c426c7a3b512c7023d12a982927ba4bfc64cb", size = 404839, upload-time = "2026-10-21T02:48:40.814Z" },
+    { url = "https://files.pythonhosted.org/packages/81/be/a96e7a86302cc1739a939041e4a457b5aca96c3ec8b8b23bfda79818c64e/kaldi_native_fbank-1.22.4-cp311-cp311-win_amd64.whl", hash = "sha256:ff65891ba3521751f54b41295df571092f2f33d53010f9d20181b7823316a5f1", size = 455683, upload-time = "2026-10-21T02:47:58.676Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/f3/afe3ee022e3341d13c76f9629d3e3b96efa5214321bb3b0307622574a44b/kaldi_native_fbank-1.22.4-cp311-cp311-win_arm64.whl", hash = "sha256:d0a0eae2aba8e395acd348d67a429db8e1c5dc82f0e708da3187dd24a93cf170", size = 450157, upload-time = "2026-10-21T06:39:57.561Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/43/de4c88dfb8773f4c0734362227e1a1fc6bb0221dbfeb098fcbd26ccfd8e0/kaldi_native_fbank-1.22.4-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:f692028ed0f20e931c9015f99706bc0629ad57f487612d6b86a17dd62116996f", size = 246785, upload-time = "2026-10-21T04:27:45.907Z" },
+    { url = "https://files.pythonhosted.org/packages/08/bd/8f3777057d2204ee53006881ab3ee5fbc1d58489eeb3e483416a9bb978f2/kaldi_native_fbank-1.22.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:34cae8854a96212f239f72bf71f3f608b433eea81e99829983492c3d27a509a6", size = 228745, upload-time = "2026-10-21T04:29:26.767Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/22/aa4933b322e5e0184931dc125cdb953ca288e15d6fb60286eb2cf8c9ac94/kaldi_native_fbank-1.22.4-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1ab5f41d7ecc8e5a9ef9a4a3721321bdef4e0c5eee7317ddee3039bdf0e07e2c", size = 298980, upload-time = "2026-10-21T02:48:12.175Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/9b/a10bc34ff33f40de3c0f8f96c3e7f52fecc99363f13e7650a959711ae88f/kaldi_native_fbank-1.22.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:21a2ec262c564b71e2105dc334e90b168af8eeab3d9d240ff831ed823364073a", size = 321382, upload-time = "2026-10-21T02:48:09.125Z" },
+    { url = "https://files.pythonhosted.org/packages/70/1d/f1b9d255822b6c2ac927c44877e76218601c08b5181c976a43838d24c063/kaldi_native_fbank-1.22.4-cp312-cp312-manylinux_2_34_armv7l.manylinux_2_35_armv7l.whl", hash = "sha256:25e86c15509ac1c6b4bbda130a43ba27eea0acf6fcd1cec7fb7352dd856cd779", size = 238862, upload-time = "2026-10-21T06:38:03.021Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/53/0563b49146626d06abe8de33992fb5db00cca61a4d860d9e49665906e0d4/kaldi_native_fbank-1.22.4-cp312-cp312-win32.whl", hash = "sha256:008e824c4a241a59702a97891e84e8fe35071001c3a6c7b5de4b84462a11a76a", size = 404228, upload-time = "2026-10-21T02:48:42.247Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/8d/d52b7ed566ae6b1f2fe45d83af29f33abba0bd1242b605e1cd52f921fb15/kaldi_native_fbank-1.22.4-cp312-cp312-win_amd64.whl", hash = "sha256:e84cc20185a732ebd83da4c59b62aebc9a93a105a8b69e7e3c05f56c45458f6d", size = 459145, upload-time = "2026-10-21T02:48:02.206Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/c9/5fa5a5a47ec1f9ddfbba1c8d240d3398def2e58bc9b511900a593ae4e1b8/kaldi_native_fbank-1.22.4-cp312-cp312-win_arm64.whl", hash = "sha256:6c2a6c99202821d5a18899f7db65a32ba91744f1780fe0ebaaa1ba2317b9c827", size = 443749, upload-time = "2026-10-21T06:38:24.782Z" },
+    { url = "https://files.pythonhosted.org/packages/37/8a/943135cf0fb5b8d0c6ae07477c5f95facf4d050f52c4bcd8fd261415665b/kaldi_native_fbank-1.22.4-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:89e61728977b1ea44cf9c3e01aee001e902cf486ceed626e9277f2e3d4d7560e", size = 246792, upload-time = "2026-10-21T04:27:43.98Z" },
+    { url = "https://files.pythonhosted.org/packages/01/c5/4cfcb1ecafea9bf25379d4d50f45f0eadd08ef42991765c8dfafcbf57085/kaldi_native_fbank-1.22.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:7eed6e25009748b76201929477ac1ee1f474752ab04a566a696eed3e075e34f9", size = 228810, upload-time = "2026-10-21T04:31:11.988Z" },
+    { url = "https://files.pythonhosted.org/packages/55/64/75842d91921068d557f85643a67d192660304642628968ec6a44a567b6b6/kaldi_native_fbank-1.22.4-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:1099a348707f191bd4ff51b84cc1bdba5c7f1fbff2b5e8066a6564711d5af810", size = 300317, upload-time = "2026-10-21T02:48:11.16Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/d2/da234f7c2aa0598a4bed68e3e710bfdb7e60a5d5731013f8d8836b525671/kaldi_native_fbank-1.22.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:424871f09b0ee96a60a2ff6a37d6c107082b9ad8a3fe7af79eafc4c1786d5484", size = 322017, upload-time = "2026-10-21T02:48:12.647Z" },
+    { url = "https://files.pythonhosted.org/packages/af/e2/47dad7dbf23c79d4dd4e71c287a974a050721d399336536a4ca9e7838eaf/kaldi_native_fbank-1.22.4-cp313-cp313-manylinux_2_34_armv7l.manylinux_2_35_armv7l.whl", hash = "sha256:ccb2036e8426b0ec242c52634630815d0fc28685087079d00c952fc792d4c74a", size = 238553, upload-time = "2026-10-21T06:38:04.459Z" },
+    { url = "https://files.pythonhosted.org/packages/af/ca/8d01d6c3557694ffd15ac794a7e572fc1df6dc10640fa9a0e12b741e89c5/kaldi_native_fbank-1.22.4-cp313-cp313-win32.whl", hash = "sha256:88a5a7fce27f6cc51617dff1fa775935ae934274abe3d9a4331c60ff946ceda6", size = 404201, upload-time = "2026-10-21T02:48:39.074Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/e1/450117983c6de462db2d35e86b542234cb79c4df497318b83a1138975eb7/kaldi_native_fbank-1.22.4-cp313-cp313-win_amd64.whl", hash = "sha256:638586ce9661cf2b16a5cf35c2900f38c307592be54ab9da266b8816eeeeb5fa", size = 459253, upload-time = "2026-10-21T02:48:00.842Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/83/5bd5ba94134c75b0c2af9ecfa7303f73f95839e4893d451245bc2b4b6673/kaldi_native_fbank-1.22.4-cp313-cp313-win_arm64.whl", hash = "sha256:2f1e999882c961526a7c314e3735a72c07b28b8763e8700a05bfa7c2c13e5a61", size = 443713, upload-time = "2026-10-21T06:38:27.885Z" },
 ]
 
 [[package]]
