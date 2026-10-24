@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Hermit Stats voices, after the build box's own nightly update
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+# Off at 10:00? It runs when the machine next wakes up.
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

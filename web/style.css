@@ -167,6 +167,7 @@ td.nowrap { white-space: nowrap; }
 .more { display: block; margin: 10px auto 2px; background: none; border: 1px solid var(--ring); border-radius: 8px; padding: 6px 14px;
   font-size: 13px; color: var(--ink-2); cursor: pointer; }
 .more:hover { background: var(--wash); }
+.more[hidden] { display: none; }
 
 .sigs { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
 .sig { border: 1px solid var(--grid); border-radius: 10px; padding: 10px; }
@@ -176,6 +177,8 @@ td.nowrap { white-space: nowrap; }
 
 .search { display: flex; gap: 8px; margin-bottom: 6px; }
 .search input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--ring); border-radius: 10px; background: var(--surface); }
+.search select { padding: 9px 10px; border: 1px solid var(--ring); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.search select[hidden] { display: none; }
 .search button { padding: 9px 16px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
 .search button:disabled { opacity: 0.7; cursor: progress; }
 .search-status { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; color: var(--ink-2); }

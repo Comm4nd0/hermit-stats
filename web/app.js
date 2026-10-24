@@ -15,7 +15,7 @@ const hours = s => s / 3600;
 const MAX_COMPARE = 3;
 const narrow = () => matchMedia('(max-width: 640px)').matches;      // phone layout
 
-const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', ep: null, card: null };
+const state = { tab: 'overview', coll: null, sel: [], lex: 'Mobs', heat: 'rate', search: '', guest: false, ep: null, card: null };
 let META, VIDEOS, H = {};
 let VISIT = { prev: null };       // when this browser last looked (unix seconds), for "new since your last visit"
 const cache = { words: {}, trans: {}, eps: {}, vids: {} };
@@ -51,6 +51,8 @@ function ago(ts) {
 }
 
 const collVids = () => VIDEOS.filter(v => v.c.includes(state.coll));
+/** The previous season of the same series, if there is one. */
+const lastSeason = () => { const ss = META.seasons, i = ss.findIndex(s => s.name === state.coll); return ss.slice(i + 1).find(s => s.series === ss[i].series) || null; };
 const present = () => [...new Set(collVids().map(v => v.h))].sort((a, b) => H[a].short.localeCompare(H[b].short));
 const scope = () => state.sel.length ? state.sel : present();           // hermits the charts cover
 const vids = () => { const s = new Set(scope()); return collVids().filter(v => s.has(v.h)); };
@@ -493,6 +495,23 @@ function* namings(list) {
   }
 }
 
+/** Who a Hermit talks with, in anyone's episodes split by voice: partner -> {sw: back-and-forths, mine: their
+ *  words, theirs: the partner's words, while the two were talking to each other}. */
+function talksWith(slug, list) {
+  const out = {};
+  for (const v of list) {
+    for (const [k, n] of Object.entries(v.sw || {})) {
+      const [a, b] = k.split('+');
+      if (a !== slug && b !== slug) continue;
+      const x = out[a === slug ? b : a] ??= { sw: 0, mine: 0, theirs: 0 };
+      x.sw += n;
+      const [wa, wb] = v.cv?.[k] || [0, 0];
+      x.mine += a === slug ? wa : wb; x.theirs += a === slug ? wb : wa;
+    }
+  }
+  return out;
+}
+
 /** Who these Hermits name, in anyone's episodes this season. */
 function mentionsBy(slugs) {
   const m = {}, who = new Set(slugs);
@@ -669,6 +688,9 @@ const TABS = {
   },
 
   async interactions(token) {
+    // The season before, to compare with when both are split by voice.
+    const before = VIDEOS.some(v => v.sp) ? lastSeason() : null;
+    const then = before ? await (cache.vids[before.name] ??= json(`data/${before.slug}/videos.json`)).catch(() => null) : null;
     const el = reset('interactions-cards', token);
     if (!el) return;
     const all = collVids(), list = vids(), ps = present(), sel = new Set(state.sel);
@@ -907,6 +929,68 @@ const TABS = {
           const [a, b] = k.split('+');
           return { name: duo(a, b), slug: sel.has(b) ? b : a, value: n, extra: `<br>in ${e} episode${e === 1 ? '' : 's'}` };
         }), { unit: 'back-and-forths', labelWidth: 200 }) });
+
+      const guest = {};   // Hermit -> [seconds talking in other Hermits' episodes, {host: true}]
+      for (const v of split) for (const [k, t] of Object.entries(v.sp))
+        if (k !== v.h && H[k] && t >= 20) { const x = guest[k] ??= [0, new Set()]; x[0] += t; x[1].add(v.h); }
+      card(el, { title: 'Best guests', sub: 'Minutes each Hermit talks in other Hermits’ episodes',
+        build: () => hbar(scope().filter(s => guest[s]).map(s => ({ name: name(s), slug: s, value: Math.round(guest[s][0] / 60),
+          extra: `<br>in ${guest[s][1].size} Hermit${guest[s][1].size === 1 ? '’s' : 's’'} episodes` })), { unit: 'minutes' }) });
+
+      if (state.sel.length === 1) {
+        const me = state.sel[0], tw = talksWith(me, split);
+        const pals = Object.keys(tw).filter(s => H[s] && tw[s].sw).sort((a, b) => tw[b].sw - tw[a].sw);
+        card(el, { title: `Who ${name(me)} talks with`, sub: `Back-and-forths with each Hermit, in anyone’s episodes · hover for ${name(me)}’s share of the talking`,
+          build: () => hbar(pals.map(s => ({ name: name(s), slug: s, value: tw[s].sw,
+            extra: `<br>${name(me)} says ${Math.round(100 * tw[s].mine / ((tw[s].mine + tw[s].theirs) || 1))}% of the words between them` })),
+          { unit: 'back-and-forths' }) });
+        card(el, { title: `Who ${name(me)} talks with, week by week`, sub: 'Back-and-forths per week with their three most frequent partners',
+          build: () => weekly(split, pals.slice(0, 3).map((s, i) => {
+            const k = [me, s].sort().join('+');
+            return { name: name(s), color: css(`--s${i + 1}`), data: countByWeek(split, v => v.sw?.[k] || 0) };
+          })) });
+      }
+
+      const was = (then || []).filter(v => v.sp && v.c.includes(before.name));
+      if (was.length) {
+        const shareOf = l => { const o = {}; for (const v of l) { const x = o[v.h] ??= [0, 0];
+          for (const [k, t] of Object.entries(v.sp)) { x[1] += t; if (k !== v.h && H[k]) x[0] += t; } } return o; };
+        const now = shareOf(split), prev = shareOf(was);
+        card(el, { title: `How social, ${state.coll} vs ${before.name}`, wide: true,
+          sub: `Share of the talking in each Hermit’s own episodes that’s other Hermits · ${full(was.length)} ${before.name} episodes split by voice`,
+          build: () => {
+            const hs = scope().filter(s => now[s]?.[1] && prev[s]?.[1]).sort((a, b) => now[b][0] / now[b][1] - now[a][0] / now[a][1]);
+            if (!hs.length) return null;
+            const pct = (o, s) => +(100 * o[s][0] / o[s][1]).toFixed(1);
+            return {
+              height: hs.length * 34 + 60,
+              option: {
+                ...base(),
+                legend: { top: 0, textStyle: { color: css('--ink-2') } },
+                grid: { ...base().grid, left: 16, top: 32, right: 24 },
+                tooltip: { ...base().tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
+                  formatter: ps => tip(ps[0].name, '', ps.map(p => `<br>${esc(p.seriesName)}: ${p.value}%`).join('')) },
+                xAxis: axis({ type: 'value', axisLabel: { color: css('--muted'), formatter: '{value}%' }, splitLine: { lineStyle: { color: css('--grid') } } }),
+                yAxis: axis({ type: 'category', inverse: true, data: hs.map(name), axisLine: { show: false }, axisLabel: { color: css('--ink-2') } }),
+                series: [[state.coll, now, '--s1'], [before.name, prev, '--s2']].map(([n, o, c]) => ({ name: n, type: 'bar', barMaxWidth: 10,
+                  data: hs.map(s => pct(o, s)), itemStyle: { color: css(c), borderRadius: [0, 3, 3, 0] } })),
+              },
+              onClick: p => toggle(hs[p.dataIndex]),
+              table: { cols: [{ k: 'n', label: 'Hermit' }, { k: 'a', label: state.coll, n: true, f: v => v.toFixed(0) + '%' }, { k: 'b', label: before.name, n: true, f: v => v.toFixed(0) + '%' }],
+                rows: hs.map(s => ({ n: name(s), a: pct(now, s), b: pct(prev, s) })) },
+            };
+          } });
+        const swOf = l => { const o = {}; for (const v of l) for (const [k, n] of Object.entries(v.sw || {})) o[k] = (o[k] || 0) + n; return o; };
+        const swNow = swOf(split), swPrev = swOf(was);
+        // Per 100 episodes split by voice, so a longer season doesn't win on length.
+        const per = (n, l) => 100 * n / l.length;
+        card(el, { title: 'New double acts', sub: `Pairs talking far more this season than in ${before.name} · back-and-forths per 100 episodes`,
+          build: () => hbar(Object.entries(swNow).filter(([k]) => mine(k) && k.split('+').every(s => H[s])).map(([k, n]) => {
+            const [a, b] = k.split('+'), p = swPrev[k] || 0;
+            return { name: duo(a, b), slug: sel.has(b) ? b : a, value: per(n, split) - per(p, was),
+              extra: `<br>${per(n, split).toFixed(0)} per 100 episodes this season, ${per(p, was).toFixed(0)} in ${before.name}` };
+          }), { unit: 'more per 100 episodes', decimals: 0, labelWidth: 200 }) });
+      }
     }
     card(el, { title: 'Named in episode titles', sub: 'Episodes whose title names another Hermit — usually a collab or a prank',
       build: () => {
@@ -1014,15 +1098,20 @@ const TABS = {
   },
 
   async search(token) {
-    const input = $('#search-input');
+    const input = $('#search-input'), where = $('#search-where');
     input.value = state.search;
+    where.hidden = !VIDEOS.some(v => v.sp);      // "as a guest" needs episodes split by voice
+    where.value = state.guest && !where.hidden ? 'guest' : '';
+    where.onchange = () => { state.guest = where.value === 'guest'; update(); };
+    const guest = !where.hidden && state.guest;
     const phrases = state.search.split(',').map(p => tokenize(p)).filter(p => p.length).slice(0, 3);
     $('#search-examples').hidden = !!phrases.length;
     searchBusy(null);
     if (!phrases.length) return catchphraseBoard(token);
     // The selected Hermits' episodes, and others' episodes they're heard in (once those are split by voice).
     const sc = new Set(scope());
-    const list = collVids().filter(v => sc.has(v.h) || Object.keys(v.sp || {}).some(s => sc.has(s)));
+    const list = collVids().filter(v => guest ? Object.keys(v.sp || {}).some(s => s !== v.h && sc.has(s))
+      : sc.has(v.h) || Object.keys(v.sp || {}).some(s => sc.has(s)));
     const slugs = [...new Set(list.map(v => v.h))];
     let loaded = 0;
     const progress = () => searchBusy(loaded < slugs.length
@@ -1049,7 +1138,7 @@ const TABS = {
     const said = phrases.map(() => ({}));     // per phrase: speaker -> times
     for (const v of list) {
       for (const [start, text, who = v.h] of docs[v.h]?.[v.id] || []) {
-        if (!sc.has(who)) continue;
+        if (!sc.has(who) || (guest && who === v.h)) continue;
         const toks = tokenize(text);
         phrases.forEach((p, i) => {
           const n = countPhrase(toks, p);
@@ -1226,6 +1315,7 @@ function tileOpts(tile) {
   const id = tile.dataset.share, v = $('.v', tile).textContent, k = $('.k', tile).textContent, cmp = $('.cmp', tile)?.textContent;
   return { id, file: shareFile(id), title: `${v} ${k}`, image: () => {
     const W = 1200, HT = 630, F = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const colW = (W - 128) / cols;
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = HT;
     const x = cv.getContext('2d');
@@ -1317,14 +1407,20 @@ function shareCard(slug, doc, img) {
   const by = {};
   for (const [who, k, c] of namings(all)) if (k === slug && who !== slug) by[who] = (by[who] || 0) + c;
   const facts = [['Signature word', doc?.x?.[0]?.[0]], ['Catchphrase', doc?.p?.[0] ? `“${doc.p[0][0]}”` : null],
-    ['Talks about most', top(mentionsBy([slug]))], ['Most talked about by', top(by)]].filter(f => f[1]);
+    ['Talks about most', top(mentionsBy([slug]))], ['Most talked about by', top(by)]];
+  // Split by voice: who they talk with, and how much of that talking is theirs.
+  const pal = Object.entries(talksWith(slug, all)).filter(([s, t]) => H[s] && t.sw).sort((a, b) => b[1].sw - a[1].sw)[0];
+  if (pal) facts.push(['Talks most with', `${name(pal[0])} (${full(pal[1].sw)} times)`],
+    ['Share of the talking with ' + name(pal[0]), `${Math.round(100 * pal[1].mine / ((pal[1].mine + pal[1].theirs) || 1))}%`]);
+  const shown = facts.filter(f => f[1]), cols = shown.length > 4 ? 3 : 2;
   const stats = [[fmt(m.videos), 'episodes'], [fmt(Math.round(m.hours)), 'hours of footage'], [fmt(m.words), 'words spoken'], [m.wpm ? m.wpm.toFixed(0) : '—', 'words a minute']];
 
   const W = 1200, HT = 630, F = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const colW = (W - 128) / cols;
   const cv = document.createElement('canvas');
   cv.width = W; cv.height = HT; cv.className = 'share-canvas';
   cv.setAttribute('role', 'img');
-  cv.setAttribute('aria-label', `${fullName(slug)}, ${state.coll}: ` + [...stats.map(([v, k]) => `${v} ${k}`), ...facts.map(([k, v]) => `${k} ${v}`)].join(', '));
+  cv.setAttribute('aria-label', `${fullName(slug)}, ${state.coll}: ` + [...stats.map(([v, k]) => `${v} ${k}`), ...shown.map(([k, v]) => `${k} ${v}`)].join(', '));
   const x = cv.getContext('2d');
   x.fillStyle = css('--surface'); x.fillRect(0, 0, W, HT);
   x.fillStyle = color(slug); x.fillRect(0, 0, W, 12);
@@ -1337,9 +1433,9 @@ function shareCard(slug, doc, img) {
   text(hermitcraft() ? `Hermitcraft ${state.coll}` : `${season().series}: ${state.coll}`, 30, 400, '--ink-2', left, 180);
   stats.forEach(([v, k], i) => { text(v, 56, 650, '--ink', 64 + i * 272, 306); text(k, 24, 400, '--ink-2', 64 + i * 272, 342, 250); });
   x.fillStyle = css('--grid'); x.fillRect(64, 378, W - 128, 2);
-  facts.forEach(([k, v], i) => {
-    const fx = 64 + (i % 2) * 560, fy = 428 + Math.floor(i / 2) * 92;
-    text(k, 22, 400, '--muted', fx, fy); text(v, 34, 600, '--ink', fx, fy + 40, 520);
+  shown.forEach(([k, v], i) => {
+    const fx = 64 + (i % cols) * colW, fy = 428 + Math.floor(i / cols) * 92;
+    text(k, 22, 400, '--muted', fx, fy, colW - 24); text(v, cols > 2 ? 28 : 34, 600, '--ink', fx, fy + 40, colW - 24);
   });
   text((META.site || location.origin).replace(/^https?:\/\//, ''), 22, 600, '--accent', 64, 598);
   x.textAlign = 'right';
@@ -1447,6 +1543,46 @@ async function episodePage(token) {
     build: () => hbar(Object.entries(v.sp).map(([s, t]) => ({ name: H[s] ? name(s) : 'Unknown voice', slug: H[s] ? s : null, value: +(t / 60).toFixed(1) })),
       { unit: 'minutes', decimals: 1, onSlug: false }) });
 
+  // In a collab, who opens and who closes.
+  const voiced = chunks.map(([, , who = v.h]) => who).filter(s => H[s]);
+  const collab = v.sp && Object.keys(v.sp).filter(s => H[s] && v.sp[s] >= 20).length > 1 && voiced.length;
+  if (v.sp) card(el, { title: 'Who’s talking when', wide: true, sub: 'Each bar is a stretch of one voice talking · click one to watch from there' +
+      (collab ? ` · first word: ${name(voiced[0])}, last word: ${name(voiced[voiced.length - 1])}` : ''),
+    build: () => {
+      const spans = [];   // [voice, start s, end s], a voice's neighbouring stretches joined up
+      chunks.forEach(([t, , who = v.h], i) => {
+        const end = Math.min(chunks[i + 1]?.[0] ?? t + 20, t + 30), last = spans[spans.length - 1];
+        if (last && last[0] === who && t - last[2] <= 5) last[2] = end;
+        else spans.push([who, t, end]);
+      });
+      const lanes = Object.keys(v.sp).sort((a, b) => (b === v.h) - (a === v.h) || (a === '?') - (b === '?') || v.sp[b] - v.sp[a])
+        .filter(s => spans.some(x => x[0] === s));
+      if (!lanes.length) return null;
+      const fill = s => s === v.h ? css('--s1') : H[s] ? css('--s2') : css('--muted');
+      const label = s => H[s] ? name(s) : 'Unknown voice';
+      return {
+        height: lanes.length * 32 + 60,
+        option: {
+          ...base(),
+          grid: { ...base().grid, right: 24, bottom: 24 },
+          tooltip: { ...base().tooltip, trigger: 'item', formatter: p => tip(label(lanes[p.value[0]]), `${clock(p.data.t)}–${clock(p.data.e)}`) },
+          xAxis: axis({ type: 'value', min: 0, max: Math.ceil(mins), name: 'minutes', nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: css('--muted') } }),
+          yAxis: axis({ type: 'category', inverse: true, data: lanes.map(label), axisLine: { show: false }, axisLabel: { color: css('--ink-2') } }),
+          series: [{ type: 'custom',
+            renderItem: (params, api) => {
+              const [x0, y] = api.coord([api.value(1), api.value(0)]), [x1] = api.coord([api.value(2), api.value(0)]);
+              const hh = api.size([0, 1])[1] * 0.6;
+              return { type: 'rect', shape: { x: x0, y: y - hh / 2, width: Math.max(1.5, x1 - x0), height: hh, r: 2 }, style: { fill: api.visual('color') } };
+            },
+            encode: { x: [1, 2], y: 0 },
+            data: spans.map(([s, t, e]) => ({ value: [lanes.indexOf(s), t / 60, e / 60], t, e, itemStyle: { color: fill(s) } })).filter(d => d.value[0] >= 0) }],
+        },
+        onClick: p => window.open(ytUrl(v.id, p.data.t), '_blank', 'noopener'),
+        table: { cols: [{ k: 'who', label: 'Voice' }, { k: 'from', label: 'From' }, { k: 'to', label: 'To' }],
+          rows: spans.map(([s, t, e]) => ({ who: label(s), from: clock(t), to: clock(e) })) },
+      };
+    } });
+
   card(el, { title: 'Pace through the episode', sub: `Words per minute, two minutes at a time · dashed line: ${h.short}’s average this season`,
     build: () => {
       const bins = [];
@@ -1543,6 +1679,10 @@ TABS.status = async function (token) {
       }).filter(r => Object.keys(label).some(k => r[k]));
       return { tableOnly: true, table: { cols: [{ k: 'name', label: 'Season' }, ...Object.entries(label).map(([k, l]) => ({ k, label: l, n: true }))], rows } };
     } });
+  if (st.voices && Object.keys(st.voices).length) card(el, { title: 'Split by voice', sub: 'Episodes where who’s talking was worked out from the audio · in the rest (new, failed, or a dubbed audio track), every word counts as the owner’s',
+    build: () => ({ tableOnly: true, table: { cols: [{ k: 'name', label: 'Season' }, { k: 'split', label: 'Split', n: true }, { k: 'all', label: 'Episodes', n: true },
+      { k: 'pct', label: 'Share', n: true, f: v => v.toFixed(0) + '%' }],
+      rows: META.collections.filter(c => st.voices[c]).map(c => ({ name: c, ...st.voices[c], pct: 100 * st.voices[c].split / st.voices[c].all })) } }) });
   card(el, { title: 'Waiting for a transcript', wide: true, sub: 'Newest first · the nightly run retries these',
     build: () => st.waiting.length ? { tableOnly: true, table: {
       cols: [{ k: 'hermit', label: 'Hermit' }, { k: 'season', label: 'Season' }, { k: 'd', label: 'Uploaded' },

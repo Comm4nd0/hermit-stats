@@ -293,6 +293,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
     (out / "avatars").mkdir(parents=True, exist_ok=True)
     lexicon = {g: [text.phrase_tokens(t) for t in terms] for g, terms in text.LEXICON.items()}
     seasons, week, counts = [], {}, defaultdict(lambda: defaultdict(Counter))   # counts: season -> slug -> source
+    voiced = defaultdict(Counter)   # season -> {'split': episodes split by voice, 'all': episodes}
     present, total = set(), set()
 
     for coll in cfg.collections:
@@ -376,6 +377,8 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
             transcripts[v["id"]] = _chunks(segments, slug if air is not None else None)
             episodes[v["id"]] = {"mt": mention_times(finder, segments, slug)}
             counts[coll.name][slug][v["source"]] += 1
+            voiced[coll.name]["all"] += 1
+            voiced[coll.name]["split"] += air is not None
             total.add(v["id"])
             dur = v["duration"] or 0
             # Pace is the owner's words over the time others weren't talking.
@@ -441,6 +444,7 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
     (out / "data" / "meta.json").write_text(json.dumps(meta, separators=(",", ":")))
     st = status(conn, cfg)
     st["counts"] = counts          # season -> hermit -> transcript source -> episodes in the stats
+    st["voices"] = {c: n for c, n in voiced.items() if n["split"]}   # seasons split by voice
     (out / "data" / "status.json").write_text(json.dumps(st, separators=(",", ":")))
 
     for f in WEB.iterdir():

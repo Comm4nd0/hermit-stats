@@ -8,3 +8,4 @@ site/
 logs/
 cookies.txt
 deploy/hermit-stats.env
+deploy/voices.env

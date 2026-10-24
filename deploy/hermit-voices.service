@@ -1,0 +1,18 @@
+[Unit]
+Description=Hermit Stats: who's talking in new episodes, copied to the build box, which rebuilds the site
+After=network-online.target
+Wants=network-online.target
+
+# A template: deploy/install-timer.sh voices fills in @REPO@ and @UV@ for this machine.
+[Service]
+Type=oneshot
+WorkingDirectory=@REPO@
+Environment=PATH=@UVDIR@:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=@UV@ sync --frozen --quiet
+ExecStartPre=-@UV@ pip install --quiet --upgrade yt-dlp[default]
+# The lock keeps it off the database while a `voices` run started by hand is using it.
+ExecStart=/usr/bin/flock -n @REPO@/logs/voices.lock @REPO@/deploy/voices-nightly.sh
+TimeoutStartSec=6h
+Nice=10
+StandardOutput=append:@REPO@/logs/voices.log
+StandardError=append:@REPO@/logs/voices.log
