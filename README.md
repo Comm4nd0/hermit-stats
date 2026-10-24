@@ -107,6 +107,12 @@ sqlite3 hermit-stats.db ".mode insert speech" "SELECT * FROM speech" | sed 's/^I
 # on CT 112:  sqlite3 hermit-stats.db < speech.sql
 ```
 
+`deploy/install-timer.sh voices` does that every day at 10:00 (after CT 112's own update), or when the desktop
+next wakes up: `deploy/voices-nightly.sh` takes a fresh copy of CT 112's database, runs `voices` on the seasons
+in `deploy/voices.env` (`PROXMOX=root@…`, `CT=112`, `SEASONS="Season 10|Season 11"`; not committed), replaces
+CT 112's `speech` rows and rebuilds the site there. Output in `logs/voices.log`. It holds `logs/voices.lock`, so
+a hand-run `voices` should too: `flock logs/voices.lock uv run hermit-stats voices …`.
+
 Episodes uploaded after a `voices` run count every word as the owner's until the next one.
 
 ## Server
