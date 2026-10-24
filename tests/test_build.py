@@ -574,3 +574,17 @@ def test_conversations_count_answers_not_reunions():
     sw, talk = build.conversations(segs, {"impulsesv", "pearlescentmoon"})
     assert sw == {"impulsesv+pearlescentmoon": 2}
     assert talk == {"impulsesv+pearlescentmoon": [6, 1]}
+
+
+def test_an_episode_in_a_voice_nobody_has_is_left_unsplit():
+    import numpy as np
+    from hermitstats import speakers
+    rng = np.random.default_rng(1)
+    prints = {h: v / np.linalg.norm(v) for h, v in (("etho", rng.normal(size=256)), ("grian", rng.normal(size=256)))}
+    near = prints["etho"] + rng.normal(scale=0.02, size=(300, 256))
+    dub = rng.normal(size=256) + rng.normal(scale=0.02, size=(300, 256))     # one steady voice, nobody's
+    near, dub = (e / np.linalg.norm(e, axis=1, keepdims=True) for e in (near, dub))
+    assert not speakers.stranger(near, prints, speakers.label(near, prints, "etho"), "etho")
+    assert speakers.stranger(dub, prints, speakers.label(dub, prints, "etho"), "etho")
+    interview = np.concatenate([dub[:250], near[:50]])            # a guest from outside, the owner asking
+    assert not speakers.stranger(interview, prints, speakers.label(interview, prints, "etho"), "etho")

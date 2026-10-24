@@ -61,7 +61,8 @@ class Voices:
         """The episode's audio, and its caption words with their times (the same track the transcript came from)."""
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         opts = {"quiet": True, "no_warnings": True, "noprogress": True,
-                "format": "250/249/251/bestaudio",       # ~50 kbps opus is plenty for voices
+                # the original track, not one of YouTube's AI dubs (a dub's voice matches nobody); ~50 kbps is plenty
+                "format": "ba[format_note*=original][abr<=80]/ba[format_note*=original]/250/249/251/bestaudio",
                 "outtmpl": str(self.audio_dir / "%(id)s.%(ext)s")}
         if cookies:
             opts.update(cookies.opts())
@@ -132,6 +133,7 @@ def caption_words(data: dict) -> list[list]:
 MIN_SIM = 0.40       # below this a window matches nobody: unknown
 OWNER_BONUS = 0.05   # in their own episode, a close call goes to the owner
 SMOOTH = 2           # windows either side averaged in, so a voice doesn't flicker word to word
+STRANGER = 0.5       # an episode whose main voice matches no voiceprint this well is nobody we know
 GAP = 2.0            # a word this far from any speech window keeps the owner (VAD missed it)
 
 
@@ -207,9 +209,28 @@ def relabel(conn, voices: Voices, videos: list[dict], log=print) -> int:
     prints = voiceprints(own)
     del own
     log(f"voiceprints for {len(prints)} Hermits from {len(cached)} episodes")
+    done, strangers = 0, []
     for v in cached:
         times, embs, words = voices.load(v["id"])
         labels = label(embs, prints, v["hermit"])
+        if stranger(embs, prints, labels, v["hermit"]):
+            db.drop_speech(conn, v["id"])           # its words stay the owner's, as without voice data
+            strangers.append(v["id"])
+            continue
         db.save_speech(conn, v["id"], attribute(words, times, labels, v["hermit"]), airtime(times, labels))
+        done += 1
     conn.commit()
-    return len(cached)
+    if strangers:
+        log(f"{len(strangers)} episodes whose main voice is no Hermit's (a dubbed audio track?), left unsplit: "
+            + " ".join(strangers))
+    return done
+
+
+def stranger(embs: np.ndarray, prints: dict[str, np.ndarray], labels: list, owner: str) -> bool:
+    """True when the owner is hardly heard and the main voice is nobody we know: YouTube served a dubbed
+    track, say. Splitting it would hand every word to nobody. (An interview with a guest from outside the
+    server still has the owner asking the questions, so it's split as usual.)"""
+    if len(embs) < 200 or not prints or labels.count(owner) >= 0.05 * len(labels):
+        return False
+    main = voiceprint(embs)
+    return max(float(main @ p) for p in prints.values()) < STRANGER

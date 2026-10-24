@@ -146,6 +146,10 @@ def save_speech(conn, video_id: str, runs: list, airtime: dict) -> None:
                  (video_id, json.dumps(runs, separators=(",", ":")), json.dumps(airtime), int(time.time())))
 
 
+def drop_speech(conn, video_id: str) -> None:
+    conn.execute("DELETE FROM speech WHERE video_id = ?", (video_id,))
+
+
 def set_error(conn, video_id: str, error: str | None) -> None:
     """Why a video still has no transcript ('whisper-wait', 'no-transcript', or the fetch error); None clears it."""
     conn.execute("UPDATE videos SET error = ?, error_at = ? WHERE id = ?",
