@@ -2,7 +2,8 @@
 hermit-stats.com {
     root * /srv/static/hermit-stats
     encode zstd gzip
-    header /data/* Cache-Control "no-cache"
+    @revalidate not path /avatars/*
+    header @revalidate Cache-Control "no-cache"
     header /avatars/* Cache-Control "public, max-age=604800"
     file_server
 }
