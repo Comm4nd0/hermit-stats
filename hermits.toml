@@ -222,8 +222,9 @@ playlist = 'final\s*life'
 video_title = '\bfinal\s*life\b'
 skip = 'stream|shorts|\blive\b|movie|react|moments|highlights|recap|trailer|teaser|deaths in|extended cut|hunger\s*games|🔴|best\s*bits|\bbest\s+of\b|\blore\b|fan[\s-]*(made|game)|training|plugin|misadventures|sims\s*4|achievement\s*hunter'
 starts = "2026-10-23"
-members = ["BigB", "GeminiTay", "GoodTimesWithScar", "Grian", "InTheLittleWood", "Mumbo Jumbo",
-           "PearlescentMoon", "SmallishBeans", "Solidarity", "ZombieCleo"]
+members = ["BdoubleO100", "BigB", "Dangthatsalongname", "GeminiTay", "GoodTimesWithScar", "Grian", "impulseSV",
+           "InTheLittleWood", "Mumbo Jumbo", "PearlescentMoon", "Rendog", "Skizzleman", "SmallishBeans", "Solidarity",
+           "ZombieCleo"]
 
 [[collection]]
 name = "Nice Life"
