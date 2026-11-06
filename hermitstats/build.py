@@ -302,6 +302,9 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
         if not start:
             continue        # no episodes yet: the season stays out of the picker
         log(f"{coll.name}: analysing {len(dates)} transcribed videos")
+        cast = [h for h in cfg.hermits if coll.includes(h)]
+        fixes = {wrong: right for h in cast for wrong, right in h.respell.items()}
+        respell = text.respeller(fixes, [e for h in cast for e in h.exclude])
         base = out / "data" / coll.slug
         for d in ("words", "transcripts", "episodes"):
             (base / d).mkdir(parents=True, exist_ok=True)
@@ -331,6 +334,8 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
                 slug, transcripts, episodes, ep_words = v["hermit"], {}, {}, {}
             v["collections"] = [c for c in v["collections"] if c in colls and colls[c].wants("", v["upload_date"])]
             said, guests, air, segments = split_speakers(v, slug, hermits)
+            said, guests = respell(said), {g: respell(t) for g, t in guests.items()}
+            segments = [{**s, "text": respell(s["text"])} for s in segments]
             raw = text.clean(said)
             toks = text.tokenize(raw)
             grams = text.ngram_index(toks, 3)
@@ -419,7 +424,8 @@ def build(conn, cfg: Config, out: Path, log=print) -> dict:
             (base / "words" / f"{s}.json").write_text(json.dumps(doc, separators=(",", ":")))
         present.update(n_eps)          # their own episodes, not only heard in others'
         (base / "videos.json").write_text(json.dumps(rows, separators=(",", ":")))
-        seasons.append({"name": coll.name, "slug": coll.slug, "series": coll.series})
+        seasons.append({"name": coll.name, "slug": coll.slug, "series": coll.series,
+                        **({"respell": fixes} if fixes else {})})
         week[coll.name] = {"from": _date(start), "to": _date(max(dates)),
                            "words": [x for x in _distinctive(recent, everyone, top=15, min_count=10) if x[1] > 0]
                            if sum(everyone.values()) > sum(recent.values()) else []}

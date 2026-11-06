@@ -1104,7 +1104,9 @@ const TABS = {
     where.value = state.guest && !where.hidden ? 'guest' : '';
     where.onchange = () => { state.guest = where.value === 'guest'; update(); };
     const guest = !where.hidden && state.guest;
-    const phrases = state.search.split(',').map(p => tokenize(p)).filter(p => p.length).slice(0, 3);
+    const fixes = season().respell ?? {};   // transcripts have the name corrected, so a search for the old spelling must be too
+    const phrases = state.search.split(',').map(p => tokenize(p).map(t => t.replace(/^[^']+/, w => fixes[w] ?? w)))
+      .filter(p => p.length).slice(0, 3);
     $('#search-examples').hidden = !!phrases.length;
     searchBusy(null);
     if (!phrases.length) return catchphraseBoard(token);

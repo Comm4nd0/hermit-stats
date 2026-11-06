@@ -605,6 +605,8 @@ name = "InTheLittleWood"
 short = "Martyn"
 channel = "@martyn"
 aliases = ["martyn", "martin", "inthelittlewood", "in the little wood"]
+respell = { martin = "martyn", martins = "martyns" }   # captions never spell him right
+exclude = ["martin luther"]
 only_listed = true
 
 [[hermit]]

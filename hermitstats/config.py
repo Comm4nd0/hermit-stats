@@ -58,6 +58,7 @@ class Hermit:
     short: str = ""
     only_listed: bool = False          # a former Hermit or Life Series player: only in collections naming them
     hermit: bool = True                # played a Hermitcraft season; Life Series-only players are friends of the Hermits
+    respell: dict[str, str] = field(default_factory=dict)   # caption spelling -> theirs, in seasons they're in
 
     @property
     def slug(self) -> str:
@@ -109,7 +110,7 @@ def load(path: Path) -> Config:
     ]
     hermits = [Hermit(h["name"], h["channel"], [a.lower() for a in h.get("aliases", [])],
                       [e.lower() for e in h.get("exclude", [])], h.get("playlists", {}), h.get("short") or h["name"],
-                      h.get("only_listed", False))
+                      h.get("only_listed", False), respell={k.lower(): v.lower() for k, v in h.get("respell", {}).items()})
                for h in raw.get("hermit", [])]
     deploy = raw.get("deploy", {})
     cfg = Config(collections, hermits, deploy.get("target"), deploy.get("url"),

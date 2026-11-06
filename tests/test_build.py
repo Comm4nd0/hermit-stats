@@ -276,6 +276,32 @@ def test_each_season_gets_its_own_folder_and_empty_ones_are_left_out(tmp_path):
     assert not (out / "data" / "words").exists()
 
 
+def test_a_name_is_respelled_only_in_seasons_its_owner_is_in(tmp_path):
+    grian = HERMITS[2]
+    martyn = Hermit("InTheLittleWood", "@martyn", ["martyn", "martin"], only_listed=True,
+                    respell={"martin": "martyn"})
+    cfg = Config([Collection("Season 11", re.compile("x"), None),
+                  Collection("Nice Life", re.compile("x"), None, members=["grian", "inthelittlewood"])],
+                 [grian, martyn], None, None)
+    conn = db.connect(tmp_path / "t.db")
+    db.upsert_channel(conn, "UCg", "grian", "Grian", grian.url, None)
+    _video(conn, "hc", "UCg", "Hermitcraft 11 Ep 1", "20251201", ["my aston martin"] * 5)
+    _video(conn, "nl", "UCg", "Nice Life: Episode 1", "20251205", ["hey martin"] * 5)
+    db.add_to_collection(conn, "Nice Life", "nl", "title")
+    conn.commit()
+    out = tmp_path / "site"
+    build.build(conn, cfg, out, log=lambda *a: None)
+    data = out / "data"
+    assert "martin" in (data / "season-11" / "transcripts" / "grian.json").read_text()
+    life = (data / "nice-life" / "transcripts" / "grian.json").read_text()
+    assert "hey martyn" in life and "martin" not in life
+    words = json.loads((data / "nice-life" / "words" / "grian.json").read_text())["Nice Life"]
+    assert ["martyn", 5] in words["w"]
+    assert json.loads((data / "nice-life" / "videos.json").read_text())[0]["m"] == {"inthelittlewood": 5}
+    seasons = json.loads((data / "meta.json").read_text())["seasons"]
+    assert [s.get("respell") for s in seasons] == [None, {"martin": "martyn"}]
+
+
 def test_life_series_players_are_hermits_or_friends_of_the_hermits(tmp_path):
     from hermitstats import config
     (tmp_path / "h.toml").write_text('''

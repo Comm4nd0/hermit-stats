@@ -60,6 +60,22 @@ def clean(text: str) -> str:
     return _HEAT.sub(" [Music] ", text)
 
 
+def respeller(fixes: dict[str, str], keep: list[str] = ()):
+    """A function correcting caption spellings of a name, keeping its first capital. Phrases in `keep` that
+    start with one of those words are left alone ("martin luther")."""
+    if not fixes:
+        return lambda text: text
+    kept = [k for k in keep if k.split()[0] in fixes]
+    terms = sorted([*fixes, *kept], key=len, reverse=True)
+    pattern = re.compile(r"\b(?:" + "|".join(re.escape(t).replace(r"\ ", r"\s+") for t in terms) + r")\b", re.I)
+
+    def swap(m):
+        right = fixes.get(m[0].lower())
+        return m[0] if right is None else right.capitalize() if m[0][0].isupper() else right
+
+    return lambda text: pattern.sub(swap, text)
+
+
 def tokenize(text: str) -> list[str]:
     text = _BRACKETED.sub(" ", text.lower()).replace("’", "'")
     return _WORD.findall(text)

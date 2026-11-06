@@ -63,6 +63,13 @@ def test_collection_filters():
     assert not c.wants("Hermitcraft #11", "20150226")
 
 
+def test_respeller_fixes_the_name_and_leaves_longer_words_and_kept_phrases():
+    fix = text.respeller({"martin": "martyn", "martins": "martyns"}, ["martin luther", "ender pearl"])
+    assert fix("hey martin, Martin's base and martins") == "hey martyn, Martyn's base and martyns"
+    assert fix("martin luther king and shawnvmartin") == "martin luther king and shawnvmartin"
+    assert text.respeller({})("martin") == "martin"
+
+
 def test_only_listed_channels_only_join_collections_that_name_them():
     martyn = Hermit("InTheLittleWood", "@martyn", ["martyn"], only_listed=True)
     season = Collection("Season 11", re.compile(r"x"), None)

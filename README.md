@@ -37,7 +37,7 @@ All the work happens at home, in LXC `hermit-stats` (CT 112, 192.168.1.227, user
 fetching from the server wouldn't work anyway.
 
 - `hermits.toml` — the roster (channel, short name, aliases incl. caption mishearings, exclusions like
-  "ender pearl"), the seasons (playlist-title / video-title patterns, skip pattern, start date) and the deploy
+  "ender pearl", `respell` for names captions always spell wrong, corrected in the seasons that Hermit is in), the seasons (playlist-title / video-title patterns, skip pattern, start date) and the deploy
   target.
 - Each Hermit's season videos come from their channel's playlist whose title matches; channels without one
   fall back to uploads whose title matches. Livestream / shorts playlists are skipped.
